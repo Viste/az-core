@@ -7,6 +7,18 @@
 #include "Config.h"
 #include "Errors.h"
 #include "Log.h"
+#include "Util.h"
+#include <algorithm>
+#include <unordered_map>
+#include <string>
+#include <fstream>
+
+
+ConfigMgr* ConfigMgr::instance()
+{
+    static ConfigMgr instance;
+    return &instance;
+}
 
 // Defined here as it must not be exposed to end-users.
 bool ConfigMgr::GetValueHelper(const char* name, ACE_TString &result)
@@ -32,11 +44,10 @@ bool ConfigMgr::GetValueHelper(const char* name, ACE_TString &result)
     return false;
 }
 
-bool ConfigMgr::LoadInitial(char const* file)
-{
-    ASSERT(file);
 
-    GuardType guard(_configLock);
+bool ConfigMgr::LoadInitial(std::string const& file, std::vector<std::string> args, std::string& error)
+{
+    std::lock_guard<std::mutex> lock(_configLock);
 
     _config.reset(new ACE_Configuration_Heap());
     if (_config->open() == 0)

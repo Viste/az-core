@@ -9,6 +9,7 @@
 
 #include "Define.h"
 #include "Errors.h"
+#include "Helpers.h"
 
 #include <algorithm>
 #include <string>
