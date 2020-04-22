@@ -11,6 +11,7 @@
 #include "WorldSession.h"
 
 #include <vector>
+#include <string>
 
 class ChatHandler;
 class Creature;
@@ -68,7 +69,6 @@ class ChatHandler
 
         static std::vector<ChatCommand> const& getCommandTable();
 
-        bool isValidChatMessage(const char* msg);
         void SendGlobalSysMessage(const char *str);
 
         bool hasStringAbbr(const char* name, const char* part);

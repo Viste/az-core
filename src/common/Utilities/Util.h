@@ -56,8 +56,6 @@ private:
     StorageType m_storage;
 };
 
-void stripLineInvisibleChars(std::string &src);
-
 int32 MoneyStringToMoney(const std::string& moneyString);
 
 std::string secsToTimeString(uint64 timeInSecs, bool shortText = false);

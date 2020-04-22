@@ -27,10 +27,42 @@
 #include "Util.h"
 #include "ScriptMgr.h"
 #include "AccountMgr.h"
+ #include "Hyperlinks.h"
 
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
+
+static void StripInvisibleChars(std::string& str)
+{
+    static std::string const invChars = " \t\7\n";
+
+    size_t wpos = 0;
+
+    bool space = false;
+    for (size_t pos = 0; pos < str.size(); ++pos)
+    {
+        if (invChars.find(str[pos]) != std::string::npos)
+        {
+            if (!space)
+            {
+                str[wpos++] = ' ';
+                space = true;
+            }
+        }
+        else
+        {
+            if (wpos != pos)
+                str[wpos++] = str[pos];
+            else
+                ++wpos;
+            space = false;
+        }
+    }
+
+    if (wpos < str.size())
+        str.erase(wpos, str.size());
+}
 
 void WorldSession::HandleMessagechatOpcode(WorldPacket & recvData)
 {
@@ -244,7 +276,6 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recvData)
     }
 
     std::string to, channel, msg;
-    bool ignoreChecks = false;
     switch (type)
     {
         case CHAT_MSG_SAY:
@@ -259,6 +290,8 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recvData)
         case CHAT_MSG_RAID_WARNING:
         case CHAT_MSG_BATTLEGROUND:
         case CHAT_MSG_BATTLEGROUND_LEADER:
+        case CHAT_MSG_AFK:
+        case CHAT_MSG_DND:
             recvData >> msg;
             break;
         case CHAT_MSG_WHISPER:
@@ -269,22 +302,14 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recvData)
             recvData >> channel;
             recvData >> msg;
             break;
-        case CHAT_MSG_AFK:
-        case CHAT_MSG_DND:
-            recvData >> msg;
-            ignoreChecks = true;
-            break;
     }
 
     // Strip invisible characters for non-addon messages
-    if (lang != LANG_ADDON && sWorld->getBoolConfig(CONFIG_CHAT_FAKE_MESSAGE_PREVENTING))
-        stripLineInvisibleChars(msg);
+    if (sWorld->getBoolConfig(CONFIG_CHAT_FAKE_MESSAGE_PREVENTING) && lang != LANG_ADDON)
+        StripInvisibleChars(msg);
 
-    // pussywizard:
-    if (lang != LANG_ADDON && msg.find("|0") != std::string::npos)
-        return;
-
-    if (!ignoreChecks)
+    // no chat commands in AFK/DND autoreply, and it can be empty
+    if (!(type == CHAT_MSG_AFK || type == CHAT_MSG_DND))
     {
         if (msg.empty())
             return;
