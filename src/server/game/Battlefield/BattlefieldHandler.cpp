@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -9,7 +9,7 @@
 #include "ObjectMgr.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
-
+#include "GameTime.h"
 #include "Battlefield.h"
 #include "BattlefieldMgr.h"
 #include "Opcodes.h"
@@ -25,7 +25,7 @@ void WorldSession::SendBfInvitePlayerToWar(uint32 BattleId, uint32 ZoneId, uint3
     WorldPacket data(SMSG_BATTLEFIELD_MGR_ENTRY_INVITE, 12);
     data << uint32(BattleId);
     data << uint32(ZoneId);
-    data << uint32((time(NULL) + p_time));
+    data << uint32((GameTime::GetGameTime() + p_time));
 
     //Sending the packet to player
     SendPacket(&data);

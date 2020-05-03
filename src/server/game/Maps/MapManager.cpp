@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -14,7 +14,6 @@
 #include "MapInstanced.h"
 #include "InstanceScript.h"
 #include "Config.h"
-#include "World.h"
 #include "CellImpl.h"
 #include "Corpse.h"
 #include "ObjectMgr.h"
@@ -27,15 +26,17 @@
 #include "LFGMgr.h"
 #include "Chat.h"
 #include "AvgDiffTracker.h"
+#include "GameConfig.h"
+
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
 
 MapManager::MapManager()
+    : _nextInstanceId(0), _scheduledScripts(0)
 {
-    i_timer[3].SetInterval(sWorld->getIntConfig(CONFIG_INTERVAL_MAPUPDATE));
+    i_timer[3].SetInterval(sGameConfig->GetIntConfig("MapUpdateInterval"));
     mapUpdateStep = 0;
-    _nextInstanceId = 0;
 }
 
 MapManager::~MapManager()
@@ -50,7 +51,7 @@ MapManager* MapManager::instance()
 
 void MapManager::Initialize()
 {
-    int num_threads(sWorld->getIntConfig(CONFIG_NUMTHREADS));
+    int num_threads(sGameConfig->GetIntConfig("MapUpdate.Threads"));
 
     // Start mtmaps if needed.
     if (num_threads > 0 && m_updater.activate(num_threads) == -1)
@@ -156,13 +157,13 @@ bool MapManager::CanPlayerEnter(uint32 mapid, Player* player, bool loginCheck)
     if (entry->IsRaid())
     {
         // can only enter in a raid group
-        if ((!group || !group->isRaidGroup()) && !sWorld->getBoolConfig(CONFIG_INSTANCE_IGNORE_RAID))
+        if ((!group || !group->isRaidGroup()) && !sGameConfig->GetBoolConfig("Instance.IgnoreRaid"))
         {
             // probably there must be special opcode, because client has this string constant in GlobalStrings.lua
             // TODO: this is not a good place to send the message
             player->GetSession()->SendAreaTriggerMessage(player->GetSession()->GetAcoreString(LANG_INSTANCE_RAID_GROUP_ONLY), mapName);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_MAPS, "MAP: Player '%s' must be in a raid group to enter instance '%s'", player->GetName().c_str(), mapName);
+            LOG_DEBUG("maps", "MAP: Player '%s' must be in a raid group to enter instance '%s'", player->GetName().c_str(), mapName);
 #endif
             return false;
         }
@@ -197,19 +198,19 @@ bool MapManager::CanPlayerEnter(uint32 mapid, Player* player, bool loginCheck)
                 WorldPacket data(SMSG_CORPSE_NOT_IN_INSTANCE, 0);
                 player->GetSession()->SendPacket(&data);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_MAPS, "MAP: Player '%s' does not have a corpse in instance '%s' and cannot enter.", player->GetName().c_str(), mapName);
+                LOG_DEBUG("maps", "MAP: Player '%s' does not have a corpse in instance '%s' and cannot enter.", player->GetName().c_str(), mapName);
 #endif
                 return false;
             }
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_MAPS, "MAP: Player '%s' has corpse in instance '%s' and can enter.", player->GetName().c_str(), mapName);
+            LOG_DEBUG("maps", "MAP: Player '%s' has corpse in instance '%s' and can enter.", player->GetName().c_str(), mapName);
 #endif
             player->ResurrectPlayer(0.5f, false);
             player->SpawnCorpseBones();
         }
         else {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_MAPS, "Map::CanPlayerEnter - player '%s' is dead but does not have a corpse!", player->GetName().c_str());
+            LOG_DEBUG("maps", "Map::CanPlayerEnter - player '%s' is dead but does not have a corpse!", player->GetName().c_str());
 #endif
         }
     }

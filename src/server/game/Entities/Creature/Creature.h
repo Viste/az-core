@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -14,7 +14,6 @@
 #include "LootMgr.h"
 #include "DatabaseEnv.h"
 #include "Cell.h"
-
 #include <list>
 
 class SpellInfo;
@@ -220,23 +219,6 @@ struct CreatureBaseStats
 
 typedef std::unordered_map<uint16, CreatureBaseStats> CreatureBaseStatsContainer;
 
-struct CreatureLocale
-{
-    StringVector Name;
-    StringVector Title;
-};
-
-struct GossipMenuItemsLocale
-{
-    StringVector OptionText;
-    StringVector BoxText;
-};
-
-struct PointOfInterestLocale
-{
-    StringVector Name;
-};
-
 #define MAX_EQUIPMENT_ITEMS 3
 
 struct EquipmentInfo
@@ -253,7 +235,7 @@ struct CreatureData
 {
     CreatureData() : id(0), mapid(0), phaseMask(0), displayid(0), equipmentId(0),
                      posX(0.0f), posY(0.0f), posZ(0.0f), orientation(0.0f), spawntimesecs(0),
-                     spawndist(0.0f), currentwaypoint(0), curhealth(0), curmana(0), movementType(0),
+                     wander_distance(0.0f), currentwaypoint(0), curhealth(0), curmana(0), movementType(0),
                      spawnMask(0), npcflag(0), unit_flags(0), dynamicflags(0), dbData(true), overwrittenZ(false) { }
     uint32 id;                                              // entry in creature_template
     uint16 mapid;
@@ -265,7 +247,7 @@ struct CreatureData
     float posZ;
     float orientation;
     uint32 spawntimesecs;
-    float spawndist;
+    float wander_distance;
     uint32 currentwaypoint;
     uint32 curhealth;
     uint32 curmana;
@@ -376,8 +358,7 @@ struct VendorItemData
 
 struct VendorItemCount
 {
-    explicit VendorItemCount(uint32 _item, uint32 _count)
-        : itemId(_item), count(_count), lastIncrementTime(time(NULL)) {}
+    VendorItemCount(uint32 _item, uint32 _count);
 
     uint32 itemId;
     uint32 count;
@@ -579,8 +560,8 @@ class Creature : public Unit, public GridObject<Creature>, public MovableMapObje
         Group* GetLootRecipientGroup() const;
         bool hasLootRecipient() const { return m_lootRecipient || m_lootRecipientGroup; }
         bool isTappedBy(Player const* player) const;                          // return true if the creature is tapped by the player or a member of his party.
-        bool CanGeneratePickPocketLoot() const { return lootPickPocketRestoreTime == 0 || lootPickPocketRestoreTime < time(NULL); }
-        void SetPickPocketLootTime() { lootPickPocketRestoreTime = time(NULL) + MINUTE + GetCorpseDelay() + GetRespawnTime(); }
+        bool CanGeneratePickPocketLoot() const;
+        void SetPickPocketLootTime();
         void ResetPickPocketLootTime() { lootPickPocketRestoreTime = 0; }
 
         void SetLootRecipient (Unit* unit, bool withGroup = true);
@@ -633,15 +614,15 @@ class Creature : public Unit, public GridObject<Creature>, public MovableMapObje
 
         time_t const& GetRespawnTime() const { return m_respawnTime; }
         time_t GetRespawnTimeEx() const;
-        void SetRespawnTime(uint32 respawn) { m_respawnTime = respawn ? time(NULL) + respawn : 0; }
+        void SetRespawnTime(uint32 respawn);
         void Respawn(bool force = false);
         void SaveRespawnTime() override;
 
         uint32 GetRespawnDelay() const { return m_respawnDelay; }
         void SetRespawnDelay(uint32 delay) { m_respawnDelay = delay; }
 
-        float GetRespawnRadius() const { return m_respawnradius; }
-        void SetRespawnRadius(float dist) { m_respawnradius = dist; }
+        float GetWanderDistance() const { return m_wanderDistance; }
+        void SetWanderDistance(float dist) { m_wanderDistance = dist; }
 
         uint32 m_groupLootTimer;                            // (msecs)timer used for group loot
         uint32 lootingGroupLowGUID;                         // used to find group which is looting corpse
@@ -735,7 +716,7 @@ class Creature : public Unit, public GridObject<Creature>, public MovableMapObje
         time_t m_respawnTime;                               // (secs) time of next respawn
         uint32 m_respawnDelay;                              // (secs) delay between corpse disappearance and respawning
         uint32 m_corpseDelay;                               // (secs) delay between death and corpse disappearance
-        float m_respawnradius;
+        float m_wanderDistance;
         uint16 m_transportCheckTimer;
         uint32 lootPickPocketRestoreTime;
 

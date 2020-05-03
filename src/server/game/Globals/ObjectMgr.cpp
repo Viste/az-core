@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -36,6 +36,9 @@
 #include "Vehicle.h"
 #include "WaypointManager.h"
 #include "World.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
 
 ScriptMapMap sSpellScripts;
 ScriptMapMap sEventScripts;
@@ -224,8 +227,7 @@ ObjectMgr::ObjectMgr():
     _hiGoGuid(1),
     _hiDoGuid(1),
     _hiCorpseGuid(1),
-    _hiMoTransGuid(1),
-    DBCLocaleIndex(LOCALE_enUS)
+    _hiMoTransGuid(1)
 {
     for (uint8 i = 0; i < MAX_CLASSES; ++i)
     {
@@ -278,117 +280,6 @@ ObjectMgr* ObjectMgr::instance()
 {
     static ObjectMgr instance;
     return &instance;
-}
-
-void ObjectMgr::AddLocaleString(std::string const& s, LocaleConstant locale, StringVector& data)
-{
-    if (!s.empty())
-    {
-        if (data.size() <= size_t(locale))
-            data.resize(locale + 1);
-
-        data[locale] = s;
-    }
-}
-
-void ObjectMgr::LoadCreatureLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _creatureLocaleStore.clear();                              // need for reload case
-
-    //                                               0      1       2     3
-    QueryResult result = WorldDatabase.Query("SELECT entry, locale, Name, Title FROM creature_template_locale");
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-        std::string Name        = fields[2].GetString();
-        std::string Title       = fields[3].GetString();
-
-        CreatureLocale& data    = _creatureLocaleStore[ID];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(Name, locale, data.Name);
-        AddLocaleString(Title, locale, data.Title);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %lu Сreature Locale strings in %u ms", (unsigned long)_creatureLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
-
-void ObjectMgr::LoadGossipMenuItemsLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _gossipMenuItemsLocaleStore.clear();                              // need for reload case
-
-    //                                               0       1            2       3           4
-    QueryResult result = WorldDatabase.Query("SELECT MenuID, OptionID, Locale, OptionText, BoxText FROM gossip_menu_option_locale");
-
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint16 MenuID           = fields[0].GetUInt16();
-        uint16 OptionID         = fields[1].GetUInt16();
-        std::string LocaleName  = fields[2].GetString();
-        std::string OptionText  = fields[3].GetString();
-        std::string BoxText     = fields[4].GetString();
-
-        GossipMenuItemsLocale& data = _gossipMenuItemsLocaleStore[MAKE_PAIR32(MenuID, OptionID)];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(OptionText, locale, data.OptionText);
-        AddLocaleString(BoxText, locale, data.BoxText);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Gossip Menu Option Locale strings in %u ms", (uint32)_gossipMenuItemsLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
-
-void ObjectMgr::LoadPointOfInterestLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _pointOfInterestLocaleStore.clear();                              // need for reload case
-
-    //                                               0   1       2
-    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Name FROM points_of_interest_locale");
-
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-        std::string Name        = fields[2].GetString();
-
-        PointOfInterestLocale& data = _pointOfInterestLocaleStore[ID];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(Name, locale, data.Name);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Points Of Interest Locale strings in %u ms", (uint32)_pointOfInterestLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
 }
 
 void ObjectMgr::LoadCreatureTemplates()
@@ -529,6 +420,7 @@ void ObjectMgr::LoadCreatureTemplates()
     }
 
     sLog->outString(">> Loaded %u creature definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    LOG_INFO("server.loading", "");
 }
 
 void ObjectMgr::LoadCreatureTemplateAddons()
@@ -1644,6 +1536,7 @@ void ObjectMgr::LoadTempSummons()
     } while (result->NextRow());
 
     sLog->outString(">> Loaded %u temp summons in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    sLog->outString();
 }
 
 void ObjectMgr::LoadCreatures()
@@ -1651,7 +1544,7 @@ void ObjectMgr::LoadCreatures()
     uint32 oldMSTime = getMSTime();
 
     //                                               0              1   2    3        4             5           6           7           8            9              10
-    QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, modelid, equipment_id, position_x, position_y, position_z, orientation, spawntimesecs, spawndist, "
+    QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, modelid, equipment_id, position_x, position_y, position_z, orientation, spawntimesecs, wander_distance, "
     //   11               12         13       14            15         16         17          18          19                20                   21
         "currentwaypoint, curhealth, curmana, MovementType, spawnMask, phaseMask, eventEntry, pool_entry, creature.npcflag, creature.unit_flags, creature.dynamicflags "
         "FROM creature "
@@ -1689,28 +1582,28 @@ void ObjectMgr::LoadCreatures()
             continue;
         }
 
-        CreatureData& data = _creatureDataStore[guid];
-        data.id             = entry;
-        data.mapid          = fields[2].GetUInt16();
-        data.displayid      = fields[3].GetUInt32();
-        data.equipmentId    = fields[4].GetInt8();
-        data.posX           = fields[5].GetFloat();
-        data.posY           = fields[6].GetFloat();
-        data.posZ           = fields[7].GetFloat();
-        data.orientation    = fields[8].GetFloat();
-        data.spawntimesecs  = fields[9].GetUInt32();
-        data.spawndist      = fields[10].GetFloat();
-        data.currentwaypoint= fields[11].GetUInt32();
-        data.curhealth      = fields[12].GetUInt32();
-        data.curmana        = fields[13].GetUInt32();
-        data.movementType   = fields[14].GetUInt8();
-        data.spawnMask      = fields[15].GetUInt8();
-        data.phaseMask      = fields[16].GetUInt32();
-        int16 gameEvent     = fields[17].GetInt8();
-        uint32 PoolId       = fields[18].GetUInt32();
-        data.npcflag        = fields[19].GetUInt32();
-        data.unit_flags     = fields[20].GetUInt32();
-        data.dynamicflags   = fields[21].GetUInt32();
+        CreatureData& data      = _creatureDataStore[guid];
+        data.id                 = entry;
+        data.mapid              = fields[2].GetUInt16();
+        data.displayid          = fields[3].GetUInt32();
+        data.equipmentId        = fields[4].GetInt8();
+        data.posX               = fields[5].GetFloat();
+        data.posY               = fields[6].GetFloat();
+        data.posZ               = fields[7].GetFloat();
+        data.orientation        = fields[8].GetFloat();
+        data.spawntimesecs      = fields[9].GetUInt32();
+        data.wander_distance    = fields[10].GetFloat();
+        data.currentwaypoint    = fields[11].GetUInt32();
+        data.curhealth          = fields[12].GetUInt32();
+        data.curmana            = fields[13].GetUInt32();
+        data.movementType       = fields[14].GetUInt8();
+        data.spawnMask          = fields[15].GetUInt8();
+        data.phaseMask          = fields[16].GetUInt32();
+        int16 gameEvent         = fields[17].GetInt8();
+        uint32 PoolId           = fields[18].GetUInt32();
+        data.npcflag            = fields[19].GetUInt32();
+        data.unit_flags         = fields[20].GetUInt32();
+        data.dynamicflags       = fields[21].GetUInt32();
 
         MapEntry const* mapEntry = sMapStore.LookupEntry(data.mapid);
         if (!mapEntry)
@@ -1756,25 +1649,25 @@ void ObjectMgr::LoadCreatures()
                 sLog->outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `creature_template`.`flags_extra` including CREATURE_FLAG_EXTRA_INSTANCE_BIND but creature are not in instance.", guid, data.id);
         }
 
-        if (data.spawndist < 0.0f)
+        if (data.wander_distance < 0.0f)
         {
-            sLog->outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `spawndist`< 0, set to 0.", guid, data.id);
-            data.spawndist = 0.0f;
+            sLog->outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `wander_distance`< 0, set to 0.", guid, data.id);
+            data.wander_distance = 0.0f;
         }
         else if (data.movementType == RANDOM_MOTION_TYPE)
         {
-            if (data.spawndist == 0.0f)
+            if (data.wander_distance == 0.0f)
             {
-                sLog->outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `MovementType`=1 (random movement) but with `spawndist`=0, replace by idle movement type (0).", guid, data.id);
+                sLog->outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `MovementType`=1 (random movement) but with `wander_distance`=0, replace by idle movement type (0).", guid, data.id);
                 data.movementType = IDLE_MOTION_TYPE;
             }
         }
         else if (data.movementType == IDLE_MOTION_TYPE)
         {
-            if (data.spawndist != 0.0f)
+            if (data.wander_distance != 0.0f)
             {
-                sLog->outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `MovementType`=0 (idle) have `spawndist`<>0, set to 0.", guid, data.id);
-                data.spawndist = 0.0f;
+                sLog->outErrorDb("Table `creature` have creature (GUID: %u Entry: %u) with `MovementType`=0 (idle) have `wander_distance`<>0, set to 0.", guid, data.id);
+                data.wander_distance = 0.0f;
             }
         }
 
@@ -1784,7 +1677,7 @@ void ObjectMgr::LoadCreatures()
             data.phaseMask = 1;
         }
 
-        if (sWorld->getBoolConfig(CONFIG_CALCULATE_CREATURE_ZONE_AREA_DATA))
+        if (sGameConfig->GetBoolConfig("Calculate.Creature.Zone.Area.Data"))
         {
             uint32 zoneId = sMapMgr->GetZoneId(data.mapid, data.posX, data.posY, data.posZ);
             uint32 areaId = sMapMgr->GetAreaId(data.mapid, data.posX, data.posY, data.posZ);
@@ -1884,7 +1777,7 @@ uint32 ObjectMgr::AddGOData(uint32 entry, uint32 mapId, float x, float y, float 
     }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_MAPS, "AddGOData: dbguid %u entry %u map %u x %f y %f z %f o %f", guid, entry, mapId, x, y, z, o);
+    LOG_DEBUG("maps", "AddGOData: dbguid %u entry %u map %u x %f y %f z %f o %f", guid, entry, mapId, x, y, z, o);
 #endif
 
     return guid;
@@ -1943,7 +1836,7 @@ uint32 ObjectMgr::AddCreData(uint32 entry, uint32 mapId, float x, float y, float
     data.posZ = z;
     data.orientation = o;
     data.spawntimesecs = spawntimedelay;
-    data.spawndist = 0;
+    data.wander_distance = 0;
     data.currentwaypoint = 0;
     data.curhealth = stats->GenerateHealth(cInfo);
     data.curmana = stats->GenerateMana(cInfo);
@@ -2120,7 +2013,7 @@ void ObjectMgr::LoadGameobjects()
             data.phaseMask = 1;
         }
 
-        if (sWorld->getBoolConfig(CONFIG_CALCULATE_GAMEOBJECT_ZONE_AREA_DATA))
+        if (sGameConfig->GetBoolConfig("Calculate.Gameoject.Zone.Area.Data"))
         {
             uint32 zoneId = sMapMgr->GetZoneId(data.mapid, data.posX, data.posY, data.posZ);
             uint32 areaId = sMapMgr->GetAreaId(data.mapid, data.posX, data.posY, data.posZ);
@@ -2221,37 +2114,7 @@ uint32 ObjectMgr::GetPlayerAccountIdByPlayerName(const std::string& name) const
     return 0;
 }
 
-void ObjectMgr::LoadItemLocales()
-{
-    uint32 oldMSTime = getMSTime();
 
-    _itemLocaleStore.clear();                                 // need for reload case
-
-    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Name, Description FROM item_template_locale");
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-        std::string Name        = fields[2].GetString();
-        std::string Description = fields[3].GetString();
-
-        ItemLocale& data        = _itemLocaleStore[ID];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(Name, locale, data.Name);
-        AddLocaleString(Description, locale, data.Description);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Item Locale strings in %u ms", (uint32)_itemLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
 
 void ObjectMgr::LoadItemTemplates()
 {
@@ -2336,6 +2199,45 @@ void ObjectMgr::LoadItemTemplates()
         itemTemplate.Stackable                 = fields[25].GetInt32();
         itemTemplate.ContainerSlots            = uint32(fields[26].GetUInt8());
         itemTemplate.StatsCount                = uint32(fields[27].GetUInt8());
+
+        // Rate.BuyValue and Rate.SellValue
+        switch (itemTemplate.Quality)
+        {
+        case ITEM_QUALITY_POOR:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Poor"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Poor"));
+            break;
+        case ITEM_QUALITY_NORMAL:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Normal"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Normal"));
+            break;
+        case ITEM_QUALITY_UNCOMMON:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Uncommon"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Uncommon"));
+            break;
+        case ITEM_QUALITY_RARE:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Rare"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Rare"));
+            break;
+        case ITEM_QUALITY_EPIC:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Epic"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Epic"));
+            break;
+        case ITEM_QUALITY_LEGENDARY:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Legendary"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Legendary"));
+            break;
+        case ITEM_QUALITY_ARTIFACT:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Artifact"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Artifact"));
+            break;
+        case ITEM_QUALITY_HEIRLOOM:
+            itemTemplate.BuyCount = itemTemplate.BuyCount * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.BuyValue.Item.Heirloom"));
+            itemTemplate.SellPrice = itemTemplate.SellPrice * static_cast<uint32>(sGameConfig->GetFloatConfig("Rate.SellValue.Item.Heirloom"));
+            break;
+        default:
+            break;
+        }
 
         for (uint8 i = 0; i < itemTemplate.StatsCount; ++i)
         {
@@ -2848,37 +2750,6 @@ ItemTemplate const* ObjectMgr::GetItemTemplate(uint32 entry)
     return entry < _itemTemplateStoreFast.size() ? _itemTemplateStoreFast[entry] : NULL;
 }
 
-void ObjectMgr::LoadItemSetNameLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _itemSetNameLocaleStore.clear();                                 // need for reload case
-
-    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Name FROM item_set_names_locale");
-
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-        std::string Name        = fields[2].GetString();
-
-        ItemSetNameLocale& data = _itemSetNameLocaleStore[ID];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(Name, locale, data.Name);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Item Set Name Locale strings in %u ms", uint32(_itemSetNameLocaleStore.size()), GetMSTimeDiffToNow(oldMSTime));
-}
-
 void ObjectMgr::LoadItemSetNames()
 {
     uint32 oldMSTime = getMSTime();
@@ -3093,7 +2964,7 @@ void ObjectMgr::LoadPetLevelInfo()
         }
 
         uint32 current_level = fields[1].GetUInt8();
-        if (current_level > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+        if (current_level > sGameConfig->GetIntConfig("MaxPlayerLevel"))
         {
             if (current_level > STRONG_MAX_LEVEL)        // hardcoded level maximum
                 sLog->outErrorDb("Wrong (> %u) level %u in `pet_levelstats` table, ignoring.", STRONG_MAX_LEVEL, current_level);
@@ -3115,7 +2986,7 @@ void ObjectMgr::LoadPetLevelInfo()
         PetLevelInfo*& pInfoMapEntry = _petInfoStore[creature_id];
 
         if (pInfoMapEntry == NULL)
-            pInfoMapEntry = new PetLevelInfo[sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)];
+            pInfoMapEntry = new PetLevelInfo[sGameConfig->GetIntConfig("MaxPlayerLevel")];
 
         // data for level 1 stored in [0] array element, ...
         PetLevelInfo* pLevelInfo = &pInfoMapEntry[current_level-1];
@@ -3147,7 +3018,7 @@ void ObjectMgr::LoadPetLevelInfo()
         }
 
         // fill level gaps
-        for (uint8 level = 1; level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL); ++level)
+        for (uint8 level = 1; level < sGameConfig->GetIntConfig("MaxPlayerLevel"); ++level)
         {
             if (pInfo[level].health == 0)
             {
@@ -3163,8 +3034,8 @@ void ObjectMgr::LoadPetLevelInfo()
 
 PetLevelInfo const* ObjectMgr::GetPetLevelInfo(uint32 creature_id, uint8 level) const
 {
-    if (level > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
-        level = sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL);
+    if (level > sGameConfig->GetIntConfig("MaxPlayerLevel"))
+        level = sGameConfig->GetIntConfig("MaxPlayerLevel");
 
     PetLevelInfoContainer::const_iterator itr = _petInfoStore.find(creature_id);
     if (itr == _petInfoStore.end())
@@ -3292,6 +3163,7 @@ void ObjectMgr::LoadPlayerInfo()
             while (result->NextRow());
 
             sLog->outString(">> Loaded %u player create definitions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+            sLog->outString();
         }
     }
 
@@ -3372,12 +3244,12 @@ void ObjectMgr::LoadPlayerInfo()
     {
         uint32 oldMSTime = getMSTime();
 
-        std::string tableName = sWorld->getBoolConfig(CONFIG_START_ALL_SPELLS) ? "playercreateinfo_spell_custom" : "playercreateinfo_spell";
+        std::string tableName = sGameConfig->GetBoolConfig("PlayerStart.AllSpells") ? "playercreateinfo_spell_custom" : "playercreateinfo_spell";
         QueryResult result = WorldDatabase.PQuery("SELECT racemask, classmask, Spell FROM %s", tableName.c_str());
 
         if (!result)
         {
-            sLog->outErrorDb(">> Loaded 0 player create spells. DB table `%s` is empty.", sWorld->getBoolConfig(CONFIG_START_ALL_SPELLS) ? "playercreateinfo_spell_custom" : "playercreateinfo_spell");
+            sLog->outErrorDb(">> Loaded 0 player create spells. DB table `%s` is empty.", sGameConfig->GetBoolConfig("PlayerStart.AllSpells") ? "playercreateinfo_spell_custom" : "playercreateinfo_spell");
         }
         else
         {
@@ -3427,6 +3299,7 @@ void ObjectMgr::LoadPlayerInfo()
             while (result->NextRow());
 
             sLog->outString(">> Loaded %u player create spells in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+            sLog->outString();
         }
     }
 
@@ -3505,7 +3378,7 @@ void ObjectMgr::LoadPlayerInfo()
             }
 
             uint8 current_level = fields[1].GetUInt8();      // Can't be > than STRONG_MAX_LEVEL (hardcoded level maximum) due to var type
-            if (current_level > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+            if (current_level > sGameConfig->GetIntConfig("MaxPlayerLevel"))
             {
                 sLog->outString("Unused (> MaxPlayerLevel in worldserver.conf) level %u in `player_classlevelstats` table, ignoring.", current_level);
                 ++count;                                    // make result loading percent "expected" correct in case disabled detail mode for example.
@@ -3516,7 +3389,7 @@ void ObjectMgr::LoadPlayerInfo()
             if (!info)
             {
                 info = new PlayerClassInfo();
-                info->levelInfo = new PlayerClassLevelInfo[sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)];
+                info->levelInfo = new PlayerClassLevelInfo[sGameConfig->GetIntConfig("MaxPlayerLevel")];
                 _playerClassInfo[current_class] = info;
             }
 
@@ -3546,7 +3419,7 @@ void ObjectMgr::LoadPlayerInfo()
             }
 
             // fill level gaps
-            for (uint8 level = 1; level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL); ++level)
+            for (uint8 level = 1; level < sGameConfig->GetIntConfig("MaxPlayerLevel"); ++level)
             {
                 if (pClassInfo->levelInfo[level].basehealth == 0)
                 {
@@ -3596,7 +3469,7 @@ void ObjectMgr::LoadPlayerInfo()
             }
 
             uint32 current_level = fields[2].GetUInt8();
-            if (current_level > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+            if (current_level > sGameConfig->GetIntConfig("MaxPlayerLevel"))
             {
                 if (current_level > STRONG_MAX_LEVEL)        // hardcoded level maximum
                     sLog->outErrorDb("Wrong (> %u) level %u in `player_levelstats` table, ignoring.", STRONG_MAX_LEVEL, current_level);
@@ -3613,7 +3486,7 @@ void ObjectMgr::LoadPlayerInfo()
             if (PlayerInfo* info = _playerInfo[current_race][current_class])
             {
                 if (!info->levelInfo)
-                    info->levelInfo = new PlayerLevelInfo[sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)];
+                    info->levelInfo = new PlayerLevelInfo[sGameConfig->GetIntConfig("MaxPlayerLevel")];
 
                 PlayerLevelInfo& levelInfo = info->levelInfo[current_level - 1];
                 for (int i = 0; i < MAX_STATS; i++)
@@ -3642,11 +3515,11 @@ void ObjectMgr::LoadPlayerInfo()
                     continue;
 
                 // skip expansion races if not playing with expansion
-                if (sWorld->getIntConfig(CONFIG_EXPANSION) < EXPANSION_THE_BURNING_CRUSADE && (race == RACE_BLOODELF || race == RACE_DRAENEI))
+                if (sGameConfig->GetIntConfig("Expansion") < EXPANSION_THE_BURNING_CRUSADE && (race == RACE_BLOODELF || race == RACE_DRAENEI))
                     continue;
 
                 // skip expansion classes if not playing with expansion
-                if (sWorld->getIntConfig(CONFIG_EXPANSION) < EXPANSION_WRATH_OF_THE_LICH_KING && class_ == CLASS_DEATH_KNIGHT)
+                if (sGameConfig->GetIntConfig("Expansion") < EXPANSION_WRATH_OF_THE_LICH_KING && class_ == CLASS_DEATH_KNIGHT)
                     continue;
 
                 // fatal error if no level 1 data
@@ -3657,7 +3530,7 @@ void ObjectMgr::LoadPlayerInfo()
                 }
 
                 // fill level gaps
-                for (uint8 level = 1; level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL); ++level)
+                for (uint8 level = 1; level < sGameConfig->GetIntConfig("MaxPlayerLevel"); ++level)
                 {
                     if (info->levelInfo[level].stats[0] == 0)
                     {
@@ -3677,8 +3550,8 @@ void ObjectMgr::LoadPlayerInfo()
     {
         uint32 oldMSTime = getMSTime();
 
-        _playerXPperLevel.resize(sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL));
-        for (uint8 level = 0; level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL); ++level)
+        _playerXPperLevel.resize(sGameConfig->GetIntConfig("MaxPlayerLevel"));
+        for (uint8 level = 0; level < sGameConfig->GetIntConfig("MaxPlayerLevel"); ++level)
             _playerXPperLevel[level] = 0;
 
         //                                                 0    1
@@ -3700,7 +3573,7 @@ void ObjectMgr::LoadPlayerInfo()
             uint32 current_level = fields[0].GetUInt8();
             uint32 current_xp    = fields[1].GetUInt32();
 
-            if (current_level >= sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+            if (current_level >= sGameConfig->GetIntConfig("MaxPlayerLevel"))
             {
                 if (current_level > STRONG_MAX_LEVEL)        // hardcoded level maximum
                     sLog->outErrorDb("Wrong (> %u) level %u in `player_xp_for_level` table, ignoring.", STRONG_MAX_LEVEL, current_level);
@@ -3720,7 +3593,7 @@ void ObjectMgr::LoadPlayerInfo()
         while (result->NextRow());
 
         // fill level gaps
-        for (uint8 level = 1; level < sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL); ++level)
+        for (uint8 level = 1; level < sGameConfig->GetIntConfig("MaxPlayerLevel"); ++level)
         {
             if (_playerXPperLevel[level] == 0)
             {
@@ -3741,8 +3614,8 @@ void ObjectMgr::GetPlayerClassLevelInfo(uint32 class_, uint8 level, PlayerClassL
 
     PlayerClassInfo const* pInfo = _playerClassInfo[class_];
 
-    if (level > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
-        level = sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL);
+    if (level > sGameConfig->GetIntConfig("MaxPlayerLevel"))
+        level = sGameConfig->GetIntConfig("MaxPlayerLevel");
 
     *info = pInfo->levelInfo[level-1];
 }
@@ -3756,7 +3629,7 @@ void ObjectMgr::GetPlayerLevelInfo(uint32 race, uint32 class_, uint8 level, Play
     if (!pInfo)
         return;
 
-    if (level <= sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+    if (level <= sGameConfig->GetIntConfig("MaxPlayerLevel"))
         *info = pInfo->levelInfo[level-1];
     else
         BuildPlayerLevelInfo(race, class_, level, info);
@@ -3765,10 +3638,10 @@ void ObjectMgr::GetPlayerLevelInfo(uint32 race, uint32 class_, uint8 level, Play
 void ObjectMgr::BuildPlayerLevelInfo(uint8 race, uint8 _class, uint8 level, PlayerLevelInfo* info) const
 {
     // base data (last known level)
-    *info = _playerInfo[race][_class]->levelInfo[sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)-1];
+    *info = _playerInfo[race][_class]->levelInfo[sGameConfig->GetIntConfig("MaxPlayerLevel")-1];
 
     // if conversion from uint32 to uint8 causes unexpected behaviour, change lvl to uint32
-    for (uint8 lvl = sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)-1; lvl < level; ++lvl)
+    for (uint8 lvl = sGameConfig->GetIntConfig("MaxPlayerLevel")-1; lvl < level; ++lvl)
     {
         switch (_class)
         {
@@ -4583,44 +4456,6 @@ void ObjectMgr::LoadQuests()
     sLog->outString();
 }
 
-void ObjectMgr::LoadQuestLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _questLocaleStore.clear();                                // need for reload case
-
-    //                                               0   1       2      3        4           5        6              7               8               9               10
-    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Title, Details, Objectives, EndText, CompletedText, ObjectiveText1, ObjectiveText2, ObjectiveText3, ObjectiveText4 FROM quest_template_locale");
-
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-
-        QuestLocale& data       = _questLocaleStore[ID];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(fields[2].GetString(), locale, data.Title);
-        AddLocaleString(fields[3].GetString(), locale, data.Details);
-        AddLocaleString(fields[4].GetString(), locale, data.Objectives);
-        AddLocaleString(fields[5].GetString(), locale, data.AreaDescription);
-        AddLocaleString(fields[6].GetString(), locale, data.CompletedText);
-
-        for (uint8 i = 0; i < 4; ++i)
-            AddLocaleString(fields[i + 7].GetString(), locale, data.ObjectiveText[i]);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Quest Locale strings in %u ms", (uint32)_questLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
-
 void ObjectMgr::LoadScripts(ScriptsType type)
 {
     uint32 oldMSTime = getMSTime();
@@ -4633,12 +4468,12 @@ void ObjectMgr::LoadScripts(ScriptsType type)
     if (tableName.empty())
         return;
 
-    if (sScriptMgr->IsScriptScheduled())                    // function cannot be called when scripts are in use.
+    if (sMapMgr->IsScriptScheduled()) // function cannot be called when scripts are in use.
         return;
 
     sLog->outString("Loading %s...", tableName.c_str());
 
-    scripts->clear();                                       // need for reload support
+    scripts->clear(); // need for reload support
 
     bool isSpellScriptTable = (type == SCRIPTS_SPELL);
     //                                                 0    1       2         3         4          5    6  7  8  9
@@ -5215,36 +5050,6 @@ PageText const* ObjectMgr::GetPageText(uint32 pageEntry)
     return NULL;
 }
 
-void ObjectMgr::LoadPageTextLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _pageTextLocaleStore.clear();                             // need for reload case
-
-    //                                               0   1       2
-    QueryResult result = WorldDatabase.Query("SELECT ID, locale, Text FROM page_text_locale");
-
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-        std::string Text        = fields[2].GetString();
-
-        PageTextLocale& data    = _pageTextLocaleStore[ID];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-
-        AddLocaleString(Text, locale, data.Text);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Page Text Locale strings in %u ms", (uint32)_pageTextLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
-
 void ObjectMgr::LoadInstanceTemplate()
 {
     uint32 oldMSTime = getMSTime();
@@ -5452,7 +5257,7 @@ void ObjectMgr::LoadGossipText()
         {
             if (gText.Options[i].BroadcastTextID)
             {
-                if (!sObjectMgr->GetBroadcastText(gText.Options[i].BroadcastTextID))
+                if (!sGameLocale->GetBroadcastText(gText.Options[i].BroadcastTextID))
                 {
                     sLog->outErrorDb("GossipText (Id: %u) in table `npc_text` has non-existing or incompatible BroadcastTextID%u %u.", id, i, gText.Options[i].BroadcastTextID);
                     gText.Options[i].BroadcastTextID = 0;
@@ -5468,54 +5273,21 @@ void ObjectMgr::LoadGossipText()
     sLog->outString();
 }
 
-void ObjectMgr::LoadNpcTextLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _npcTextLocaleStore.clear();                              // need for reload case
-
-    QueryResult result = WorldDatabase.Query("SELECT ID, Locale, "
-        //   2        3        4        5        6        7        8        9        10       11       12       13       14       15       16       17
-        "Text0_0, Text0_1, Text1_0, Text1_1, Text2_0, Text2_1, Text3_0, Text3_1, Text4_0, Text4_1, Text5_0, Text5_1, Text6_0, Text6_1, Text7_0, Text7_1 "
-        "FROM npc_text_locale");
-
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-
-        NpcTextLocale& data     = _npcTextLocaleStore[ID];
-        LocaleConstant locale   = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        for (uint8 i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
-        {
-            AddLocaleString(fields[2 + i * 2].GetString(), locale, data.Text_0[i]);
-            AddLocaleString(fields[3 + i * 2].GetString(), locale, data.Text_1[i]);
-        }
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Npc Text Locale strings in %u ms", (uint32)_npcTextLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
-
 void ObjectMgr::ReturnOrDeleteOldMails(bool serverUp)
 {
     uint32 oldMSTime = getMSTime();
 
-    time_t curTime = time(NULL);
+    time_t curTime = GameTime::GetGameTime();
 
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_EXPIRED_MAIL);
     stmt->setUInt32(0, curTime);
+    
     PreparedQueryResult result = CharacterDatabase.Query(stmt);
     if (!result)
+    {
+        sLog->outString();
         return;
+    }
 
     std::map<uint32 /*messageId*/, MailItemInfoVec> itemsCache;
     stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_EXPIRED_MAIL_ITEMS);
@@ -5689,65 +5461,7 @@ void ObjectMgr::LoadQuestAreaTriggers()
     sLog->outString();
 }
 
-void ObjectMgr::LoadQuestOfferRewardLocale()
-{
-    uint32 oldMSTime = getMSTime();
 
-    _questOfferRewardLocaleStore.clear(); // need for reload case
-
-    //                                               0     1          2
-    QueryResult result = WorldDatabase.Query("SELECT Id, locale, RewardText FROM quest_offer_reward_locale");
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 id = fields[0].GetUInt32();
-        std::string localeName = fields[1].GetString();
-
-        LocaleConstant locale = GetLocaleByName(localeName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        QuestOfferRewardLocale& data = _questOfferRewardLocaleStore[id];
-        AddLocaleString(fields[2].GetString(), locale, data.RewardText);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %lu Quest Offer Reward locale strings in %u ms", _questOfferRewardLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
-
-void ObjectMgr::LoadQuestRequestItemsLocale()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _questRequestItemsLocaleStore.clear(); // need for reload case
-
-    //                                               0     1          2
-    QueryResult result = WorldDatabase.Query("SELECT Id, locale, CompletionText FROM quest_request_items_locale");
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 id = fields[0].GetUInt32();
-        std::string localeName = fields[1].GetString();
-
-        LocaleConstant locale = GetLocaleByName(localeName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        QuestRequestItemsLocale& data = _questRequestItemsLocaleStore[id];
-        AddLocaleString(fields[2].GetString(), locale, data.CompletionText);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %lu Quest Request Items locale strings in %u ms", _questRequestItemsLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
 
 void ObjectMgr::LoadTavernAreaTriggers()
 {
@@ -6379,39 +6093,6 @@ uint32 ObjectMgr::GenerateRecycledLowGuid(HighGuid guidHigh)
     return GenerateLowGuid(guidHigh);
 }
 
-void ObjectMgr::LoadGameObjectLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _gameObjectLocaleStore.clear(); // need for reload case
-
-    //                                               0      1       2     3
-    QueryResult result = WorldDatabase.Query("SELECT entry, locale, name, castBarCaption FROM gameobject_template_locale");
-    if (!result)
-        return;
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID                   = fields[0].GetUInt32();
-        std::string LocaleName      = fields[1].GetString();
-        std::string Name            = fields[2].GetString();
-        std::string CastBarCaption  = fields[3].GetString();
-
-        GameObjectLocale& data      = _gameObjectLocaleStore[ID];
-        LocaleConstant locale       = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(Name, locale, data.Name);
-        AddLocaleString(CastBarCaption, locale, data.CastBarCaption);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Gameobject Locale strings in %u ms", (uint32)_gameObjectLocaleStore.size(), GetMSTimeDiffToNow(oldMSTime));
-}
-
 inline void CheckGOLockId(GameObjectTemplate const* goInfo, uint32 dataN, uint32 N)
 {
     if (sLockStore.LookupEntry(dataN))
@@ -6961,6 +6642,7 @@ void ObjectMgr::LoadReputationRewardRate()
     while (result->NextRow());
 
     sLog->outString(">> Loaded %u reputation_reward_rate in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    sLog->outString();
 }
 
 void ObjectMgr::LoadReputationOnKill()
@@ -7417,7 +7099,6 @@ void ObjectMgr::LoadQuestRelationsHelper(QuestRelations& map, std::string const&
     } while (result->NextRow());
 
     sLog->outString(">> Loaded %u quest relations from %s in %u ms", count, table.c_str(), GetMSTimeDiffToNow(oldMSTime));
-    sLog->outString();
 }
 
 void ObjectMgr::LoadGameobjectQuestStarters()
@@ -7543,7 +7224,7 @@ enum LanguageType
 
 static LanguageType GetRealmLanguageType(bool create)
 {
-    switch (sWorld->getIntConfig(CONFIG_REALM_ZONE))
+    switch (sGameConfig->GetIntConfig("RealmZone"))
     {
         case REALM_ZONE_UNKNOWN:                            // any language
         case REALM_ZONE_DEVELOPMENT:
@@ -7614,11 +7295,11 @@ uint8 ObjectMgr::CheckPlayerName(const std::string& name, bool create)
     if (wname.size() > MAX_PLAYER_NAME)
         return CHAR_NAME_TOO_LONG;
 
-    uint32 minName = sWorld->getIntConfig(CONFIG_MIN_PLAYER_NAME);
+    uint32 minName = sGameConfig->GetIntConfig("MinPlayerName");
     if (wname.size() < minName)
         return CHAR_NAME_TOO_SHORT;
 
-    uint32 strictMask = sWorld->getIntConfig(CONFIG_STRICT_PLAYER_NAMES);
+    uint32 strictMask = sGameConfig->GetIntConfig("StrictPlayerNames");
     if (!isValidString(wname, strictMask, false, create))
         return CHAR_NAME_MIXED_LANGUAGES;
 
@@ -7639,11 +7320,11 @@ bool ObjectMgr::IsValidCharterName(const std::string& name)
     if (wname.size() > MAX_CHARTER_NAME)
         return false;
 
-    uint32 minName = sWorld->getIntConfig(CONFIG_MIN_CHARTER_NAME);
+    uint32 minName = sGameConfig->GetIntConfig("MinCharterName");
     if (wname.size() < minName)
         return false;
 
-    uint32 strictMask = sWorld->getIntConfig(CONFIG_STRICT_CHARTER_NAMES);
+    uint32 strictMask = sGameConfig->GetIntConfig("StrictCharterNames");
 
     return isValidString(wname, strictMask, true);
 }
@@ -7657,7 +7338,7 @@ bool ObjectMgr::IsValidChannelName(const std::string& name)
     if (wname.size() > MAX_CHANNEL_NAME)
         return false;
 
-    uint32 strictMask = sWorld->getIntConfig(CONFIG_STRICT_CHANNEL_NAMES);
+    uint32 strictMask = sGameConfig->GetIntConfig("StrictChannelNames");
 
     return isValidString(wname, strictMask, true);
 }
@@ -7671,11 +7352,11 @@ PetNameInvalidReason ObjectMgr::CheckPetName(const std::string& name)
     if (wname.size() > MAX_PET_NAME)
         return PET_NAME_TOO_LONG;
 
-    uint32 minName = sWorld->getIntConfig(CONFIG_MIN_PET_NAME);
+    uint32 minName = sGameConfig->GetIntConfig("MinPetName");
     if (wname.size() < minName)
         return PET_NAME_TOO_SHORT;
 
-    uint32 strictMask = sWorld->getIntConfig(CONFIG_STRICT_PET_NAMES);
+    uint32 strictMask = sGameConfig->GetIntConfig("StrictPetNames");
     if (!isValidString(wname, strictMask, false))
         return PET_NAME_MIXED_LANGUAGES;
 
@@ -7753,55 +7434,6 @@ void ObjectMgr::LoadGameObjectForQuests()
 
     sLog->outString(">> Loaded %u GameObjects for quests in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
     sLog->outString();
-}
-
-bool ObjectMgr::LoadAcoreStrings()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _acoreStringStore.clear(); // for reload case
-    QueryResult result = WorldDatabase.PQuery("SELECT entry, content_default, content_loc1, content_loc2, content_loc3, content_loc4, content_loc5, content_loc6, content_loc7, content_loc8 FROM acore_string");
-    if (!result)
-    {
-        sLog->outString(">> Loaded 0 acore strings. DB table `acore_strings` is empty.");
-        sLog->outString();
-        return false;
-    }
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 entry = fields[0].GetUInt32();
-
-        AcoreString& data = _acoreStringStore[entry];
-
-        data.Content.resize(DEFAULT_LOCALE + 1);
-
-        for (uint8 i = 0; i < TOTAL_LOCALES; ++i)
-            AddLocaleString(fields[i + 1].GetString(), LocaleConstant(i), data.Content);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %u acore strings in %u ms", (uint32)_acoreStringStore.size(), GetMSTimeDiffToNow(oldMSTime));
-    sLog->outString();
-
-    return true;
-}
-
-char const* ObjectMgr::GetAcoreString(uint32 entry, LocaleConstant locale) const
-{
-    if (AcoreString const* ts = GetAcoreString(entry))
-    {
-        if (ts->Content.size() > size_t(locale) && !ts->Content[locale].empty())
-            return ts->Content[locale].c_str();
-
-        return ts->Content[DEFAULT_LOCALE].c_str();
-    }
-
-    sLog->outErrorDb("Trinity string entry %u not found in DB.", entry);
-
-    return "<error>";
 }
 
 void ObjectMgr::LoadFishingBaseSkillLevel()
@@ -8242,7 +7874,7 @@ void ObjectMgr::LoadTrainerSpell()
 
     if (!result)
     {
-        sLog->outErrorDb(">>  Loaded 0 Trainers. DB table `npc_trainer` is empty!");
+        sLog->outErrorDb(">> Loaded 0 Trainers. DB table `npc_trainer` is empty!");
         sLog->outString();
         return;
     }
@@ -8324,7 +7956,7 @@ void ObjectMgr::LoadVendors()
     if (!result)
     {
         sLog->outString();
-        sLog->outErrorDb(">>  Loaded 0 Vendors. DB table `npc_vendor` is empty!");
+        sLog->outErrorDb(">> Loaded 0 Vendors. DB table `npc_vendor` is empty!");
         return;
     }
 
@@ -8443,7 +8075,7 @@ void ObjectMgr::LoadGossipMenuItems()
             gMenuItem.OptionIcon = GOSSIP_ICON_CHAT;
         }
 
-        if (gMenuItem.OptionBroadcastTextID && !GetBroadcastText(gMenuItem.OptionBroadcastTextID))
+        if (gMenuItem.OptionBroadcastTextID && !sGameLocale->GetBroadcastText(gMenuItem.OptionBroadcastTextID))
         {
             sLog->outErrorDb("Table `gossip_menu_option` for menu %u, id %u has non-existing or incompatible OptionBroadcastTextID %u, ignoring.", gMenuItem.MenuID, gMenuItem.OptionID, gMenuItem.OptionBroadcastTextID);
             gMenuItem.OptionBroadcastTextID = 0;
@@ -8458,7 +8090,7 @@ void ObjectMgr::LoadGossipMenuItems()
             gMenuItem.ActionPoiID = 0;
         }
 
-        if (gMenuItem.BoxBroadcastTextID && !GetBroadcastText(gMenuItem.BoxBroadcastTextID))
+        if (gMenuItem.BoxBroadcastTextID && !sGameLocale->GetBroadcastText(gMenuItem.BoxBroadcastTextID))
         {
             sLog->outErrorDb("Table `gossip_menu_option` for menu %u, id %u has non-existing or incompatible BoxBroadcastTextID %u, ignoring.", gMenuItem.MenuID, gMenuItem.OptionID, gMenuItem.BoxBroadcastTextID);
             gMenuItem.BoxBroadcastTextID = 0;
@@ -8654,136 +8286,6 @@ uint32 ObjectMgr::GetScriptId(const char *name)
         return 0;
 
     return uint32(itr - _scriptNamesStore.begin());
-}
-
-void ObjectMgr::LoadBroadcastTexts()
-{
-    uint32 oldMSTime = getMSTime();
-
-    _broadcastTextStore.clear(); // for reload case
-
-    //                                               0   1         2         3           4         5         6         7            8            9            10       11    12
-    QueryResult result = WorldDatabase.Query("SELECT ID, Language, MaleText, FemaleText, EmoteID0, EmoteID1, EmoteID2, EmoteDelay0, EmoteDelay1, EmoteDelay2, SoundId, Unk1, Unk2 FROM broadcast_text");
-    if (!result)
-    {
-        sLog->outString(">> Loaded 0 broadcast texts. DB table `broadcast_text` is empty.");
-        sLog->outString();
-        return;
-    }
-
-    _broadcastTextStore.rehash(result->GetRowCount());
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        BroadcastText bct;
-
-        bct.Id = fields[0].GetUInt32();
-        bct.Language = fields[1].GetUInt32();
-        bct.MaleText[DEFAULT_LOCALE] = fields[2].GetString();
-        bct.FemaleText[DEFAULT_LOCALE] = fields[3].GetString();
-        bct.EmoteId0 = fields[4].GetUInt32();
-        bct.EmoteId1 = fields[5].GetUInt32();
-        bct.EmoteId2 = fields[6].GetUInt32();
-        bct.EmoteDelay0 = fields[7].GetUInt32();
-        bct.EmoteDelay1 = fields[8].GetUInt32();
-        bct.EmoteDelay2 = fields[9].GetUInt32();
-        bct.SoundId = fields[10].GetUInt32();
-        bct.Unk1 = fields[11].GetUInt32();
-        bct.Unk2 = fields[12].GetUInt32();
-
-        if (bct.SoundId)
-        {
-            if (!sSoundEntriesStore.LookupEntry(bct.SoundId))
-            {
-                sLog->outDebug(LOG_FILTER_NONE, "BroadcastText (Id: %u) in table `broadcast_text` has SoundId %u but sound does not exist.", bct.Id, bct.SoundId);
-                bct.SoundId = 0;
-            }
-        }
-
-        if (!GetLanguageDescByID(bct.Language))
-        {
-            sLog->outDebug(LOG_FILTER_NONE, "BroadcastText (Id: %u) in table `broadcast_text` using Language %u but Language does not exist.", bct.Id, bct.Language);
-            bct.Language = LANG_UNIVERSAL;
-        }
-
-        if (bct.EmoteId0)
-        {
-            if (!sEmotesStore.LookupEntry(bct.EmoteId0))
-            {
-                sLog->outDebug(LOG_FILTER_NONE, "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId0 %u but emote does not exist.", bct.Id, bct.EmoteId0);
-                bct.EmoteId0 = 0;
-            }
-        }
-
-        if (bct.EmoteId1)
-        {
-            if (!sEmotesStore.LookupEntry(bct.EmoteId1))
-            {
-                sLog->outDebug(LOG_FILTER_NONE, "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId1 %u but emote does not exist.", bct.Id, bct.EmoteId1);
-                bct.EmoteId1 = 0;
-            }
-        }
-
-        if (bct.EmoteId2)
-        {
-            if (!sEmotesStore.LookupEntry(bct.EmoteId2))
-            {
-                sLog->outDebug(LOG_FILTER_NONE, "BroadcastText (Id: %u) in table `broadcast_text` has EmoteId2 %u but emote does not exist.", bct.Id, bct.EmoteId2);
-                bct.EmoteId2 = 0;
-            }
-        }
-
-        _broadcastTextStore[bct.Id] = bct;
-    }
-    while (result->NextRow());
-
-    sLog->outString(">> Loaded " SZFMTD " broadcast texts in %u ms", _broadcastTextStore.size(), GetMSTimeDiffToNow(oldMSTime));
-    sLog->outString();
-}
-
-void ObjectMgr::LoadBroadcastTextLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    //                                               0   1       2         3
-    QueryResult result = WorldDatabase.Query("SELECT ID, locale, MaleText, FemaleText FROM broadcast_text_locale");
-
-    if (!result)
-    {
-        sLog->outString(">> Loaded 0 broadcast text locales. DB table `broadcast_text_locale` is empty.");
-        sLog->outString();
-        return;
-    }
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 id               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-        std::string MaleText    = fields[2].GetString();
-        std::string FemaleText  = fields[3].GetString();
-
-        BroadcastTextContainer::iterator bct = _broadcastTextStore.find(id);
-        if (bct == _broadcastTextStore.end())
-        {
-            sLog->outErrorDb("BroadcastText (Id: %u) in table `broadcast_text_locale` does not exist. Skipped!", id);
-            continue;
-        }
-
-        LocaleConstant locale = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        AddLocaleString(MaleText, locale, bct->second.MaleText);
-        AddLocaleString(FemaleText, locale, bct->second.FemaleText);
-    }
-    while (result->NextRow());
-
-    sLog->outString(">> Loaded %u Broadcast Text Locales in %u ms", uint32(_broadcastTextStore.size()), GetMSTimeDiffToNow(oldMSTime));
-    sLog->outString();
 }
 
 CreatureBaseStats const* ObjectMgr::GetCreatureBaseStats(uint8 level, uint8 unitClass)
@@ -9209,6 +8711,7 @@ void ObjectMgr::LoadGameObjectQuestItems()
     while (result->NextRow());
 
     sLog->outString(">> Loaded %u gameobject quest items in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    sLog->outString();
 }
 
 void ObjectMgr::LoadCreatureQuestItems()
@@ -9239,4 +8742,5 @@ void ObjectMgr::LoadCreatureQuestItems()
     while (result->NextRow());
 
     sLog->outString(">> Loaded %u creature quest items in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    sLog->outString();
 }

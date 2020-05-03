@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * 
  *
  * This program is free software licensed under GPL version 2
@@ -14,6 +14,7 @@
 #include "CellImpl.h"
 #include "ObjectMgr.h"
 #include "TemporarySummon.h"
+#include "GameTime.h"
 
 // Spell summary for ScriptedAI::SelectSpell
 struct TSpellSummary
@@ -456,9 +457,9 @@ bool ScriptedAI::EnterEvadeIfOutOfCombatArea()
     if (me->IsInEvadeMode() || !me->IsInCombat())
         return false;
 
-    if (_evadeCheckCooldown == time(NULL))
+    if (_evadeCheckCooldown == GameTime::GetGameTime())
         return false;
-    _evadeCheckCooldown = time(NULL);
+    _evadeCheckCooldown = GameTime::GetGameTime();
 
     if (!CheckEvadeIfOutOfCombatArea())
         return false;

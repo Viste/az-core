@@ -1,11 +1,10 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
 
 #include "MMapFactory.h"
-#include "World.h"
 #include <set>
 
 namespace MMAP
@@ -21,12 +20,6 @@ namespace MMAP
             g_MMapManager = new MMapManager();
 
         return g_MMapManager;
-    }
-
-    bool MMapFactory::IsPathfindingEnabled(const Map* map)
-    {
-        if (!map) return false;
-        return !forbiddenMaps[map->GetId()] && (sWorld->getBoolConfig(CONFIG_ENABLE_MMAPS) ? true : map->IsBattlegroundOrArena());
     }
 
     void MMapFactory::InitializeDisabledMaps()

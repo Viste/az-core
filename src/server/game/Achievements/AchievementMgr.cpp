@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -31,6 +31,9 @@
 #include "SpellMgr.h"
 #include "World.h"
 #include "WorldPacket.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
 
 namespace acore
 {
@@ -42,7 +45,7 @@ namespace acore
 
             void operator()(WorldPacket& data, LocaleConstant loc_idx)
             {
-                std::string text = sObjectMgr->GetAcoreString(i_textId, loc_idx);
+                std::string text = sGameLocale->GetAcoreString(i_textId, loc_idx);
                 ChatHandler::BuildChatPacket(data, i_msgtype, LANG_UNIVERSAL, &i_player, &i_player, text, i_achievementId);
             }
 
@@ -426,7 +429,7 @@ bool AchievementCriteriaData::Meets(uint32 criteria_id, Player const* source, Un
             return source->GetMapId() == map_id.mapId;
         case ACHIEVEMENT_CRITERIA_DATA_TYPE_NTH_BIRTHDAY:
         {
-            time_t birthday_start = time_t(sWorld->getIntConfig(CONFIG_BIRTHDAY_TIME));
+            time_t birthday_start = time_t(sGameConfig->GetIntConfig("BirthdayTime"));
             tm birthday_tm;
             ACE_OS::localtime_r(&birthday_start, &birthday_tm);
 
@@ -434,7 +437,7 @@ bool AchievementCriteriaData::Meets(uint32 criteria_id, Player const* source, Un
             birthday_tm.tm_year += birthday_login.nth_birthday;
 
             time_t birthday = mktime(&birthday_tm);
-            time_t now = sWorld->GetGameTime();
+            time_t now = GameTime::GetGameTime();
             return now <= birthday + DAY && now >= birthday;
         }
         case ACHIEVEMENT_CRITERIA_DATA_TYPE_S_KNOWN_TITLE:
@@ -498,7 +501,7 @@ void AchievementMgr::ResetAchievementCriteria(AchievementCriteriaCondition condi
     if (m_player->IsGameMaster())
         return;
 
-    sLog->outDebug(LOG_FILTER_ACHIEVEMENTSYS, "AchievementMgr::ResetAchievementCriteria(%u, %u, %u)", condition, value, evenIfCriteriaComplete);
+    LOG_DEBUG("achievement", "AchievementMgr::ResetAchievementCriteria(%u, %u, %u)", condition, value, evenIfCriteriaComplete);
 
     AchievementCriteriaEntryList const* achievementCriteriaList = sAchievementMgr->GetAchievementCriteriaByCondition(condition, value);
     if (!achievementCriteriaList)
@@ -642,7 +645,7 @@ void AchievementMgr::LoadFromDB(PreparedQueryResult achievementResult, PreparedQ
                 continue;
             }
 
-            if (criteria->timeLimit && time_t(date + criteria->timeLimit) < time(NULL))
+            if (criteria->timeLimit && time_t(date + criteria->timeLimit) < GameTime::GetGameTime())
                 continue;
 
             CriteriaProgress& progress = m_criteriaProgress[id];
@@ -663,7 +666,7 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement) 
         return;
 
     #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS) && defined(ACORE_DEBUG) 
-        sLog->outDebug(LOG_FILTER_ACHIEVEMENTSYS, "AchievementMgr::SendAchievementEarned(%u)", achievement->ID);
+        LOG_DEBUG("achievement", "AchievementMgr::SendAchievementEarned(%u)", achievement->ID);
     #endif
 
     if (Guild* guild = sGuildMgr->GetGuildById(GetPlayer()->GetGuildId()))
@@ -693,17 +696,17 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement) 
 
         acore::AchievementChatBuilder say_builder(*GetPlayer(), CHAT_MSG_ACHIEVEMENT, LANG_ACHIEVEMENT_EARNED, achievement->ID);
         acore::LocalizedPacketDo<acore::AchievementChatBuilder> say_do(say_builder);
-        acore::PlayerDistWorker<acore::LocalizedPacketDo<acore::AchievementChatBuilder> > say_worker(GetPlayer(), sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY), say_do);
+        acore::PlayerDistWorker<acore::LocalizedPacketDo<acore::AchievementChatBuilder> > say_worker(GetPlayer(), sGameConfig->GetFloatConfig("ListenRange.Say"), say_do);
         TypeContainerVisitor<acore::PlayerDistWorker<acore::LocalizedPacketDo<acore::AchievementChatBuilder> >, WorldTypeMapContainer > message(say_worker);
-        cell.Visit(p, message, *GetPlayer()->GetMap(), *GetPlayer(), sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY));
+        cell.Visit(p, message, *GetPlayer()->GetMap(), *GetPlayer(), sGameConfig->GetFloatConfig("ListenRange.Say"));
     }
 
     WorldPacket data(SMSG_ACHIEVEMENT_EARNED, 8+4+8);
     data.append(GetPlayer()->GetPackGUID());
     data << uint32(achievement->ID);
-    data.AppendPackedTime(time(NULL));
+    data.AppendPackedTime(GameTime::GetGameTime());
     data << uint32(0);
-    GetPlayer()->SendMessageToSetInRange(&data, sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY), true);
+    GetPlayer()->SendMessageToSetInRange(&data, sGameConfig->GetFloatConfig("ListenRange.Say"), true);
 }
 
 void AchievementMgr::SendCriteriaUpdate(AchievementCriteriaEntry const* entry, CriteriaProgress const* progress, uint32 timeElapsed, bool timedCompleted) const
@@ -760,11 +763,11 @@ void AchievementMgr::UpdateAchievementCriteria(AchievementCriteriaTypes type, ui
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
     if (type >= ACHIEVEMENT_CRITERIA_TYPE_TOTAL)
     {
-        sLog->outDebug(LOG_FILTER_ACHIEVEMENTSYS, "UpdateAchievementCriteria: Wrong criteria type %u", type);
+        LOG_DEBUG("achievement", "UpdateAchievementCriteria: Wrong criteria type %u", type);
         return;
     }
     
-    sLog->outDebug(LOG_FILTER_ACHIEVEMENTSYS, "AchievementMgr::UpdateAchievementCriteria(%u, %u, %u)", type, miscValue1, miscValue2);
+    LOG_DEBUG("achievement", "AchievementMgr::UpdateAchievementCriteria(%u, %u, %u)", type, miscValue1, miscValue2);
 #endif
 
     AchievementCriteriaEntryList const* achievementCriteriaList = NULL;
@@ -2000,7 +2003,7 @@ void AchievementMgr::SetCriteriaProgress(AchievementCriteriaEntry const* entry, 
         return;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_ACHIEVEMENTSYS, "AchievementMgr::SetCriteriaProgress(%u, %u) for (GUID:%u)", entry->ID, changeValue, m_player->GetGUIDLow());
+    LOG_DEBUG("achievement", "AchievementMgr::SetCriteriaProgress(%u, %u) for (GUID:%u)", entry->ID, changeValue, m_player->GetGUIDLow());
 #endif
 
     CriteriaProgress* progress = GetCriteriaProgress(entry);
@@ -2043,7 +2046,7 @@ void AchievementMgr::SetCriteriaProgress(AchievementCriteriaEntry const* entry, 
     }
 
     progress->changed = true;
-    progress->date = time(NULL); // set the date to the latest update.
+    progress->date = GameTime::GetGameTime(); // set the date to the latest update.
 
     uint32 timeElapsed = 0;
     bool timedCompleted = false;
@@ -2163,7 +2166,7 @@ void AchievementMgr::CompletedAchievement(AchievementEntry const* achievement)
 
     SendAchievementEarned(achievement);
     CompletedAchievementData& ca = m_completedAchievements[achievement->ID];
-    ca.date = time(NULL);
+    ca.date = GameTime::GetGameTime();
     ca.changed = true;
 
     sScriptMgr->OnAchievementComplete(GetPlayer(), achievement);
@@ -2219,8 +2222,24 @@ void AchievementMgr::CompletedAchievement(AchievementEntry const* achievement)
         MailDraft draft(reward->mailTemplate);
 
         if (!reward->mailTemplate)
-            draft = MailDraft(reward->subject, reward->text);
+        {
+            std::string subject = reward->subject;
+            std::string text = reward->text;
+            
+            LocaleConstant localeConstant = GetPlayer()->GetSession()->GetSessionDbLocaleIndex();
 
+            if (localeConstant != LOCALE_enUS)
+            {
+                if(AchievementRewardLocale const* loc = sGameLocale->GetAchievementRewardLocale(achievement->ID))
+                {
+                    sGameLocale->GetLocaleString(loc->Subject, localeConstant, subject);
+                    sGameLocale->GetLocaleString(loc->Text, localeConstant, text);
+                }
+            }
+          
+            draft = MailDraft(subject, text);
+        }
+		
         SQLTransaction trans = CharacterDatabase.BeginTransaction();
 
         Item* item = reward->itemId ? Item::CreateItem(reward->itemId, 1, GetPlayer()) : NULL;
@@ -2876,50 +2895,5 @@ void AchievementGlobalMgr::LoadRewards()
     while (result->NextRow());
 
     sLog->outString(">> Loaded %u achievement rewards in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
-    sLog->outString();
-}
-
-void AchievementGlobalMgr::LoadRewardLocales()
-{
-    uint32 oldMSTime = getMSTime();
-
-    m_achievementRewardLocales.clear();                       // need for reload case
-
-    //                                               0   1       2        3
-    QueryResult result = WorldDatabase.Query("SELECT ID, Locale, Subject, Text FROM achievement_reward_locale");
-
-    if (!result)
-    {
-        sLog->outString(">> Loaded 0 achievement reward locale strings.  DB table `achievement_reward_locale` is empty");
-        sLog->outString();
-        return;
-    }
-
-    do
-    {
-        Field* fields = result->Fetch();
-
-        uint32 ID               = fields[0].GetUInt32();
-        std::string LocaleName  = fields[1].GetString();
-        std::string Subject     = fields[2].GetString();
-        std::string Text        = fields[3].GetString();
-
-        if (m_achievementRewards.find(ID) == m_achievementRewards.end())
-        {
-            sLog->outErrorDb("Table `achievement_reward_locale` (Entry: %u) has locale strings for non-existing achievement reward.", ID);
-            continue;
-        }
-
-        AchievementRewardLocale& data = m_achievementRewardLocales[ID];
-        LocaleConstant locale = GetLocaleByName(LocaleName);
-        if (locale == LOCALE_enUS)
-            continue;
-
-        ObjectMgr::AddLocaleString(Subject, locale, data.Subject);
-        ObjectMgr::AddLocaleString(Text, locale, data.Text);
-
-    } while (result->NextRow());
-
-    sLog->outString(">> Loaded %lu Achievement Reward Locale strings in %u ms", (unsigned long)m_achievementRewardLocales.size(), GetMSTimeDiffToNow(oldMSTime));
     sLog->outString();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,6 +16,8 @@
 #include "WorldPacket.h"
 #include "Chat.h"
 #include "WorldSession.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
 {
@@ -23,9 +25,9 @@ void WorldSession::HandleGMTicketCreateOpcode(WorldPacket& recvData)
     if (sTicketMgr->GetStatus() == GMTICKET_QUEUE_STATUS_DISABLED)
         return;
 
-    if (GetPlayer()->getLevel() < sWorld->getIntConfig(CONFIG_TICKET_LEVEL_REQ))
+    if (GetPlayer()->getLevel() < sGameConfig->GetIntConfig("LevelReq.Ticket"))
     {
-        SendNotification(GetAcoreString(LANG_TICKET_REQ), sWorld->getIntConfig(CONFIG_TICKET_LEVEL_REQ));
+        SendNotification(GetAcoreString(LANG_TICKET_REQ), sGameConfig->GetIntConfig("LevelReq.Ticket"));
         return;
     }
 
@@ -237,7 +239,7 @@ void WorldSession::HandleReportLag(WorldPacket& recv_data)
     stmt->setFloat (4, y);
     stmt->setFloat (5, z);
     stmt->setUInt32(6, GetLatency());
-    stmt->setUInt32(7, time(NULL));
+    stmt->setUInt32(7, GameTime::GetGameTime());
     CharacterDatabase.Execute(stmt);
 }
 
@@ -247,7 +249,7 @@ void WorldSession::HandleGMResponseResolve(WorldPacket& /*recvPacket*/)
     if (GmTicket* ticket = sTicketMgr->GetTicketByPlayer(GetPlayer()->GetGUID()))
     {
         uint8 getSurvey = 0;
-        if (float(rand_chance()) < sWorld->getFloatConfig(CONFIG_CHANCE_OF_GM_SURVEY))
+        if (float(rand_chance()) < sGameConfig->GetFloatConfig("GM.TicketSystem.ChanceOfGMSurvey"))
             getSurvey = 1;
 
         WorldPacket data(SMSG_GMRESPONSE_STATUS_UPDATE, 4);

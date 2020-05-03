@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -17,12 +17,15 @@
 #include "Util.h"
 #include "ScriptMgr.h"
 #include "WorldSession.h"
+#include "Opcodes.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 /// Create the Weather object
 Weather::Weather(uint32 zone, WeatherData const* weatherChances)
     : m_zone(zone), m_weatherChances(weatherChances)
 {
-    m_timer.SetInterval(sWorld->getIntConfig(CONFIG_INTERVAL_CHANGEWEATHER));
+    m_timer.SetInterval(sGameConfig->GetIntConfig("ChangeWeatherInterval"));
     m_type = WEATHER_TYPE_FINE;
     m_grade = 0;
 
@@ -82,7 +85,7 @@ bool Weather::ReGenerate()
 
     //78 days between January 1st and March 20nd; 365/4=91 days by season
     // season source http://aa.usno.navy.mil/data/docs/EarthSeasons.html
-    time_t gtime = sWorld->GetGameTime();
+    time_t gtime = GameTime::GetGameTime();
     struct tm ltime;
     ACE_OS::localtime_r(&gtime, &ltime);
     uint32 season = ((ltime.tm_yday - 78 + 365)/91)%4;

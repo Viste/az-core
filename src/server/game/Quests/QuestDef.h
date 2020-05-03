@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -162,29 +162,7 @@ enum QuestSpecialFlags
     QUEST_SPECIAL_FLAGS_PLAYER_KILL          = 0x800    // Internal flag computed only
 };
 
-struct QuestLocale
-{
-    QuestLocale() { ObjectiveText.resize(QUEST_OBJECTIVES_COUNT); }
 
-    StringVector Title;
-    StringVector Details;
-    StringVector Objectives;
-    StringVector OfferRewardText;
-    StringVector RequestItemsText;
-    StringVector AreaDescription;
-    StringVector CompletedText;
-    std::vector< StringVector > ObjectiveText;
-};
-
-struct QuestRequestItemsLocale
-{
-    std::vector<std::string> CompletionText;
-};
-
-struct QuestOfferRewardLocale
-{
-    std::vector<std::string> RewardText;
-};
 
 // This Quest class provides a convenient way to access a few pretotaled (cached) quest details,
 // all base quest information, and any utility functions such as generating the amount of

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -19,10 +19,13 @@
 #include "GameObjectAI.h"
 #include "Transport.h"
 #include "ScriptMgr.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include <time.h>
+
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
-#include <time.h>
 
 GameEventMgr* GameEventMgr::instance()
 {
@@ -37,7 +40,7 @@ bool GameEventMgr::CheckOneGameEvent(uint16 entry) const
         default:
         case GAMEEVENT_NORMAL:
         {
-            time_t currenttime = time(NULL);
+            time_t currenttime = GameTime::GetGameTime();
             // Get the event information
             return mGameEvent[entry].start < currenttime
                 && currenttime < mGameEvent[entry].end
@@ -54,7 +57,7 @@ bool GameEventMgr::CheckOneGameEvent(uint16 entry) const
         // if inactive world event, check the prerequisite events
         case GAMEEVENT_WORLD_INACTIVE:
         {
-            time_t currenttime = time(NULL);
+            time_t currenttime = GameTime::GetGameTime();
             for (std::set<uint16>::const_iterator itr = mGameEvent[entry].prerequisite_events.begin(); itr != mGameEvent[entry].prerequisite_events.end(); ++itr)
             {
                 if ((mGameEvent[*itr].state != GAMEEVENT_WORLD_NEXTPHASE && mGameEvent[*itr].state != GAMEEVENT_WORLD_FINISHED) ||   // if prereq not in nextphase or finished state, then can't start this one
@@ -70,7 +73,7 @@ bool GameEventMgr::CheckOneGameEvent(uint16 entry) const
 
 uint32 GameEventMgr::NextCheck(uint16 entry) const
 {
-    time_t currenttime = time(NULL);
+    time_t currenttime = GameTime::GetGameTime();
 
     // for NEXTPHASE state world events, return the delay to start the next event, so the followup event will be checked correctly
     if ((mGameEvent[entry].state == GAMEEVENT_WORLD_NEXTPHASE || mGameEvent[entry].state == GAMEEVENT_WORLD_FINISHED) && mGameEvent[entry].nextstart >= currenttime)
@@ -130,7 +133,7 @@ bool GameEventMgr::StartEvent(uint16 event_id, bool overwrite)
         ApplyNewEvent(event_id);
         if (overwrite)
         {
-            mGameEvent[event_id].start = time(NULL);
+            mGameEvent[event_id].start = GameTime::GetGameTime();
             if (data.end <= data.start)
                 data.end = data.start + data.length;
         }
@@ -178,7 +181,7 @@ void GameEventMgr::StopEvent(uint16 event_id, bool overwrite)
 
     if (overwrite && !serverwide_evt)
     {
-        data.start = time(NULL) - data.length * MINUTE;
+        data.start = GameTime::GetGameTime() - data.length * MINUTE;
         if (data.end <= data.start)
             data.end = data.start + data.length;
     }
@@ -242,7 +245,7 @@ void GameEventMgr::LoadFromDB()
             pGameEvent.start        = time_t(starttime);
             uint64 endtime          = fields[2].GetUInt64();
             if (fields[2].IsNull())
-                endtime             = time(nullptr) + 63072000; // add 2 years to current date
+                endtime             = GameTime::GetGameTime() + 63072000; // add 2 years to current date
             pGameEvent.end          = time_t(endtime);
             pGameEvent.occurence    = fields[3].GetUInt64();
             pGameEvent.length       = fields[4].GetUInt64();
@@ -982,8 +985,8 @@ void GameEventMgr::LoadHolidayDates()
 {
     uint32 oldMSTime = getMSTime();
 
-    //                                               0   1         2
-    QueryResult result = WorldDatabase.Query("SELECT id, date_id, date_value FROM holiday_dates");
+    //                                               0   1        2           3
+    QueryResult result = WorldDatabase.Query("SELECT id, date_id, date_value, holiday_duration FROM holiday_dates");
 
     if (!result)
     {
@@ -995,20 +998,28 @@ void GameEventMgr::LoadHolidayDates()
     do
     {
         Field* fields = result->Fetch();
+
         uint32 holidayId = fields[0].GetUInt32();
+
         HolidaysEntry* entry = const_cast<HolidaysEntry*>(sHolidaysStore.LookupEntry(holidayId));
         if (!entry)
         {
             sLog->outErrorDb("holiday_dates entry has invalid holiday id %u.", holidayId);
             continue;
         }
+
         uint8 dateId = fields[1].GetUInt8();
         if (dateId >= MAX_HOLIDAY_DATES)
         {
             sLog->outErrorDb("holiday_dates entry has out of range date_id %u.", dateId);
             continue;
         }
+
         entry->Date[dateId] = fields[2].GetUInt32();
+
+        if (uint32 duration = fields[3].GetUInt32())
+            entry->Duration[0] = duration;
+
         modifiedHolidays.insert(entry->Id);
         ++count;
 
@@ -1069,7 +1080,7 @@ uint32 GameEventMgr::StartSystem()                           // return the next 
 
 void GameEventMgr::StartArenaSeason()
 {
-    uint8 season = sWorld->getIntConfig(CONFIG_ARENA_SEASON_ID);
+    uint8 season = sGameConfig->GetIntConfig("Arena.ArenaSeason.ID");
     QueryResult result = WorldDatabase.PQuery("SELECT eventEntry FROM game_event_arena_seasons WHERE season = '%i'", season);
 
     if (!result)
@@ -1094,7 +1105,7 @@ void GameEventMgr::StartArenaSeason()
 
 uint32 GameEventMgr::Update()                               // return the next event delay in ms
 {
-    time_t currenttime = time(NULL);
+    time_t currenttime = GameTime::GetGameTime();
     uint32 nextEventDelay = max_ge_check_delay;             // 1 day
     uint32 calcDelay;
     std::set<uint16> activate, deactivate;
@@ -1199,7 +1210,7 @@ void GameEventMgr::UnApplyEvent(uint16 event_id)
 void GameEventMgr::ApplyNewEvent(uint16 event_id)
 {
     uint8 announce = mGameEvent[event_id].announce;
-    if (announce == 1 || (announce == 2 && sWorld->getIntConfig(CONFIG_EVENT_ANNOUNCE)))
+    if (announce == 1 || (announce == 2 && sGameConfig->GetIntConfig("Event.Announce")))
         sWorld->SendWorldText(LANG_EVENTMESSAGE, mGameEvent[event_id].description.c_str());
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
@@ -1676,7 +1687,7 @@ bool GameEventMgr::CheckOneGameEventConditions(uint16 event_id)
     // set the followup events' start time
     if (!mGameEvent[event_id].nextstart)
     {
-        time_t currenttime = time(NULL);
+        time_t currenttime = GameTime::GetGameTime();
         mGameEvent[event_id].nextstart = currenttime + mGameEvent[event_id].length * 60;
     }
     return true;
@@ -1773,7 +1784,7 @@ void GameEventMgr::SetHolidayEventTime(GameEventData& event)
 
     bool singleDate = ((holiday->Date[0] >> 24) & 0x1F) == 31; // Events with fixed date within year have - 1
 
-    time_t curTime = time(NULL);
+    time_t curTime = GameTime::GetGameTime();
     for (int i = 0; i < MAX_HOLIDAY_DATES && holiday->Date[i]; ++i)
     {
         uint32 date = holiday->Date[i];

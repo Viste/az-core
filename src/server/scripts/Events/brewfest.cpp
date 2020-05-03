@@ -12,6 +12,7 @@
 #include "LFGMgr.h"
 #include "PassiveAI.h"
 #include "CellImpl.h"
+#include "GameTime.h"
 
 ///////////////////////////////////////
 ////// GOS
@@ -212,7 +213,7 @@ public:
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
 
-            switch (events.GetEvent())
+            switch (events.ExecuteEvent())
             {
                 case EVENT_DIREBREW_RESPAWN1:
                     SummonSister(NPC_ILSA_DIREBREW);
@@ -325,7 +326,7 @@ public:
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
 
-            switch (events.GetEvent())
+            switch (events.ExecuteEvent())
             {
                 case EVENT_SISTERS_BARREL:
                     me->CastSpell(me->GetVictim(), SPELL_BARRELED, false);
@@ -436,7 +437,7 @@ public:
                     {
                         if (Aura* aur = player->GetAura(SPELL_RAM_AURA))
                         {
-                            int32 diff = aur->GetApplyTime() - (time(NULL)-(HOUR*18)+spellCooldown);
+                            int32 diff = aur->GetApplyTime() - (GameTime::GetGameTime()-(HOUR*18)+spellCooldown);
                             if (diff > 10) // aura applied later
                                 return;
 
@@ -703,7 +704,7 @@ public:
         void UpdateAI(uint32 diff)
         {
             events.Update(diff);
-            switch (events.GetEvent())
+            switch (events.ExecuteEvent())
             {
                 case EVENT_CHECK_HOUR:
                 {
@@ -844,7 +845,7 @@ public:
 
         bool AllowStart()
         {
-            time_t curtime = time(NULL);
+            time_t curtime = GameTime::GetGameTime();
             tm strDate;
             ACE_OS::localtime_r(&curtime, &strDate);
 

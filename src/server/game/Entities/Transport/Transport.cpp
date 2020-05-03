@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -20,6 +20,7 @@
 #include "CellImpl.h"
 #include "WorldModel.h"
 #include "Spell.h"
+#include "GameTime.h"
 
 MotionTransport::MotionTransport() : Transport(), _transportInfo(NULL), _isMoving(true), _pendingStop(false), _triggeredArrivalEvent(false), _triggeredDepartureEvent(false), _passengersLoaded(false), _delayedTeleport(false)
 {
@@ -91,7 +92,7 @@ bool MotionTransport::CreateMoTrans(uint32 guidlow, uint32 entry, uint32 mapid, 
     // pussywizard: no PathRotation for MotionTransports
     SetTransportPathRotation(0.0f, 0.0f, 0.0f, 1.0f);
 
-    m_model = GameObjectModel::Create(*this);
+    m_model = CreateModel();
     return true;
 }
 
@@ -281,7 +282,7 @@ void MotionTransport::RemovePassenger(WorldObject* passenger, bool withAll)
         if (Player* plr = passenger->ToPlayer())
         {
             sScriptMgr->OnRemovePassenger(ToTransport(), plr);
-            plr->SetFallInformation(time(NULL), plr->GetPositionZ());
+            plr->SetFallInformation(GameTime::GetGameTime(), plr->GetPositionZ());
         }
 
         if (withAll)
@@ -712,7 +713,7 @@ bool StaticTransport::Create(uint32 guidlow, uint32 name_id, Map* map, uint32 ph
     SetDisplayId(goinfo->displayId);
 
     if (!m_model)
-        m_model = GameObjectModel::Create(*this);
+        m_model = CreateModel();
 
     SetGoType(GameobjectTypes(goinfo->type));
     SetGoState(go_state);
@@ -955,7 +956,7 @@ void StaticTransport::RemovePassenger(WorldObject* passenger, bool withAll)
         if (Player* plr = passenger->ToPlayer())
         {
             sScriptMgr->OnRemovePassenger(ToTransport(), plr);
-            plr->SetFallInformation(time(NULL), plr->GetPositionZ());
+            plr->SetFallInformation(GameTime::GetGameTime(), plr->GetPositionZ());
         }
 
         if (withAll)

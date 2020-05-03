@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -27,7 +27,7 @@ namespace VMAP
         MOD_HAS_BOUND = 1<<2
     };
 
-    class ModelSpawn
+    class AC_COMMON_API ModelSpawn
     {
         public:
             //mapID, tileX, tileY, Flags, ID, Pos, Rot, Scale, Bound_lo, Bound_hi, name
@@ -48,7 +48,7 @@ namespace VMAP
             static bool writeToFile(FILE* rw, const ModelSpawn &spawn);
     };
 
-    class ModelInstance: public ModelSpawn
+    class AC_COMMON_API ModelInstance: public ModelSpawn
     {
         public:
             ModelInstance(): iInvScale(0.0f), iModel(0) { }
@@ -58,12 +58,11 @@ namespace VMAP
             void intersectPoint(const G3D::Vector3& p, AreaInfo &info) const;
             bool GetLocationInfo(const G3D::Vector3& p, LocationInfo &info) const;
             bool GetLiquidLevel(const G3D::Vector3& p, LocationInfo &info, float &liqHeight) const;
+            WorldModel* getWorldModel() { return iModel; }
         protected:
             G3D::Matrix3 iInvRot;
             float iInvScale;
             WorldModel* iModel;
-        public:
-            WorldModel* getWorldModel();
     };
 } // namespace VMAP
 

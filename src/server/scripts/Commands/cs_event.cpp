@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,6 +16,7 @@ EndScriptData */
 #include "Language.h"
 #include "Player.h"
 #include "ScriptMgr.h"
+#include "GameTime.h"
 
 class event_commandscript : public CommandScript
 {
@@ -104,8 +105,8 @@ public:
         std::string endTimeStr = TimeToTimestampStr(eventData.end);
 
         uint32 delay = sGameEventMgr->NextCheck(eventId);
-        time_t nextTime = time(nullptr) + delay;
-        std::string nextStr = nextTime >= eventData.start && nextTime < eventData.end ? TimeToTimestampStr(time(nullptr) + delay) : "-";
+        time_t nextTime = GameTime::GetGameTime() + delay;
+        std::string nextStr = nextTime >= eventData.start && nextTime < eventData.end ? TimeToTimestampStr(GameTime::GetGameTime() + delay) : "-";
 
         std::string occurenceStr = secsToTimeString(eventData.occurence * MINUTE, true);
         std::string lengthStr = secsToTimeString(eventData.length * MINUTE, true);

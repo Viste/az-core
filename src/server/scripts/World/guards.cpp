@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -160,8 +160,38 @@ public:
     }
 };
 
+class Duel_Items : public PlayerScript
+{
+public:
+	Duel_Items() : PlayerScript("Duel_Items") {}
+
+	void OnDuelEnd(Player *winner, Player *looser, DuelCompleteType type)
+	{
+		if (type == DUEL_WON)
+		{
+			if(winner->HasItemCount(58165, 1, false) && (looser->HasItemCount(58165, 1, false)))
+            {
+				looser->GetSession()->SendNotification("[Система дуэлей] Вы проиграли");	
+				looser->DestroyItemCount(58165, 1, true);
+				
+				winner->GetSession()->SendNotification("[Система дуэлей] Вы выйграли");
+				winner->AddItem(58165, 1);		  
+            } 
+	        else
+            {	
+				looser->GetSession()->SendNotification("[Система дуэлей] У вас нет нужной валюты");
+				winner->GetSession()->SendNotification("[Система дуэлей] У вас нет нужной валюты");
+	        }
+		}
+		
+		winner->HandleEmoteCommand(EMOTE_ONESHOT_CHEER);
+	}
+
+};
+
 void AddSC_guards()
 {
     new guard_shattrath_aldor();
     new guard_shattrath_scryer();
+	new Duel_Items();
 }

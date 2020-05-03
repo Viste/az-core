@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU AGPL3 v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
+# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -59,15 +59,20 @@ target_include_directories(worldserver
 
 target_link_libraries(worldserver
   PRIVATE
-    game-interface
-    scripts-interface
+    acore-core-interface
   PUBLIC
+    scripts
     game
     shared
-    scripts
     gsoap
     readline
     ${GPERFTOOLS_LIBRARIES})
+
+if (NOT DISABLED_ALL_MODULES AND MODULES_EXIST)
+target_link_libraries(worldserver
+  PUBLIC
+    modules)
+endif()
 
 set_target_properties(worldserver
   PROPERTIES

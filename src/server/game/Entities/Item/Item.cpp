@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,6 +16,8 @@
 #include "ConditionMgr.h"
 #include "Player.h"
 #include "WorldSession.h"
+#include "Opcodes.h"
+#include "GameTime.h"
 
 void AddItemsSetItem(Player* player, Item* item)
 {
@@ -236,7 +238,7 @@ Item::Item()
     m_container = NULL;
     m_lootGenerated = false;
     mb_in_trade = false;
-    m_lastPlayedTimeUpdate = time(NULL);
+    m_lastPlayedTimeUpdate = GameTime::GetGameTime();
 
     m_refundRecipient = 0;
     m_paidMoney = 0;
@@ -284,7 +286,7 @@ void Item::UpdateDuration(Player* owner, uint32 diff)
         return;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_PLAYER_ITEMS, "Item::UpdateDuration Item (Entry: %u Duration %u Diff %u)", GetEntry(), GetUInt32Value(ITEM_FIELD_DURATION), diff);
+    LOG_DEBUG("entities.player.items", "Item::UpdateDuration Item (Entry: %u Duration %u Diff %u)", GetEntry(), GetUInt32Value(ITEM_FIELD_DURATION), diff);
 #endif
 
     if (GetUInt32Value(ITEM_FIELD_DURATION) <= diff)
@@ -679,7 +681,7 @@ void Item::AddToUpdateQueueOf(Player* player)
     if (player->GetGUID() != GetOwnerGUID())
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_PLAYER_ITEMS, "Item::AddToUpdateQueueOf - Owner's guid (%u) and player's guid (%u) don't match!", GUID_LOPART(GetOwnerGUID()), player->GetGUIDLow());
+        LOG_DEBUG("entities.player.items", "Item::AddToUpdateQueueOf - Owner's guid (%u) and player's guid (%u) don't match!", GUID_LOPART(GetOwnerGUID()), player->GetGUIDLow());
 #endif
         return;
     }
@@ -701,7 +703,7 @@ void Item::RemoveFromUpdateQueueOf(Player* player)
     if (player->GetGUID() != GetOwnerGUID())
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_PLAYER_ITEMS, "Item::RemoveFromUpdateQueueOf - Owner's guid (%u) and player's guid (%u) don't match!", GUID_LOPART(GetOwnerGUID()), player->GetGUIDLow());
+        LOG_DEBUG("entities.player.items", "Item::RemoveFromUpdateQueueOf - Owner's guid (%u) and player's guid (%u) don't match!", GUID_LOPART(GetOwnerGUID()), player->GetGUIDLow());
 #endif
         return;
     }
@@ -1143,7 +1145,7 @@ void Item::UpdatePlayedTime(Player* owner)
     // Get current played time
     uint32 current_playtime = GetUInt32Value(ITEM_FIELD_CREATE_PLAYED_TIME);
     // Calculate time elapsed since last played time update
-    time_t curtime = time(NULL);
+    time_t curtime = GameTime::GetGameTime();
     uint32 elapsed = uint32(curtime - m_lastPlayedTimeUpdate);
     uint32 new_playtime = current_playtime + elapsed;
     // Check if the refund timer has expired yet
@@ -1164,7 +1166,7 @@ void Item::UpdatePlayedTime(Player* owner)
 
 uint32 Item::GetPlayedTime()
 {
-    time_t curtime = time(NULL);
+    time_t curtime = GameTime::GetGameTime();
     uint32 elapsed = uint32(curtime - m_lastPlayedTimeUpdate);
     return GetUInt32Value(ITEM_FIELD_CREATE_PLAYED_TIME) + elapsed;
 }

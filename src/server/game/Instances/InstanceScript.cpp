@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -18,6 +18,7 @@
 #include "WorldSession.h"
 #include "Opcodes.h"
 #include "Spell.h"
+#include "GameConfig.h"
 
 void InstanceScript::SaveToDB()
 {
@@ -44,7 +45,7 @@ void InstanceScript::HandleGameObject(uint64 GUID, bool open, GameObject* go)
         go->SetGoState(open ? GO_STATE_ACTIVE : GO_STATE_READY);
     else {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_TSCR, "TSCR: InstanceScript: HandleGameObject failed");
+        LOG_DEBUG("tscr", "TSCR: InstanceScript: HandleGameObject failed");
 #endif
     }
 }
@@ -68,7 +69,7 @@ void InstanceScript::LoadMinionData(const MinionData* data)
         ++data;
     }
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_TSCR, "InstanceScript::LoadMinionData: " UI64FMTD " minions loaded.", uint64(minions.size()));
+    LOG_DEBUG("tscr", "InstanceScript::LoadMinionData: " UI64FMTD " minions loaded.", uint64(minions.size()));
 #endif
 }
 
@@ -82,7 +83,7 @@ void InstanceScript::LoadDoorData(const DoorData* data)
         ++data;
     }
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_TSCR, "InstanceScript::LoadDoorData: " UI64FMTD " doors loaded.", uint64(doors.size()));
+    LOG_DEBUG("tscr", "InstanceScript::LoadDoorData: " UI64FMTD " doors loaded.", uint64(doors.size()));
 #endif
 }
 
@@ -303,7 +304,7 @@ void InstanceScript::DoUpdateWorldState(uint32 uiStateId, uint32 uiStateData)
     }
     else {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_TSCR, "TSCR: DoUpdateWorldState attempt send data but no players in map.");
+        LOG_DEBUG("tscr", "TSCR: DoUpdateWorldState attempt send data but no players in map.");
 #endif
     }
 }
@@ -465,4 +466,9 @@ std::string InstanceScript::GetBossStateName(uint8 state)
         default:
             return "INVALID";
     }
+}
+
+bool InstanceScript::ServerAllowsTwoSideGroups() const
+{
+    return sGameConfig->GetBoolConfig("AllowTwoSide.Interaction.Group");
 }

@@ -12,6 +12,7 @@
 #include "MoveSplineInit.h"
 #include "MoveSpline.h"
 #include "Spell.h"
+#include "GameConfig.h"
 
 template<>
 void RandomMovementGenerator<Creature>::_setRandomLocation(Creature* creature)
@@ -187,7 +188,7 @@ void RandomMovementGenerator<Creature>::_setRandomLocation(Creature* creature)
     init.SetWalk(true);
     init.Launch();
 
-    if (sWorld->getBoolConfig(CONFIG_DONT_CACHE_RANDOM_MOVEMENT_PATHS))
+    if (sGameConfig->GetBoolConfig("DontCacheRandomMovementPaths"))
         _preComputedPaths.erase(pathIdx);
 
     //Call for creature group update
@@ -202,10 +203,10 @@ void RandomMovementGenerator<Creature>::DoInitialize(Creature* creature)
         return;
 
     if (!_wanderDistance)
-        _wanderDistance = creature->GetRespawnRadius();
+        _wanderDistance = creature->GetWanderDistance();
 
-    _nextMoveTime.Reset(creature->GetDBTableGUIDLow() && creature->GetRespawnRadius() == _wanderDistance ? urand(1, 5000) : 0);
-    _wanderDistance = std::max((creature->GetRespawnRadius() == _wanderDistance && creature->GetInstanceId() == 0) ? (creature->CanFly() ? MIN_WANDER_DISTANCE_AIR : MIN_WANDER_DISTANCE_GROUND) : 0.0f, _wanderDistance);
+    _nextMoveTime.Reset(creature->GetDBTableGUIDLow() && creature->GetWanderDistance() == _wanderDistance ? urand(1, 5000) : 0);
+    _wanderDistance = std::max((creature->GetWanderDistance() == _wanderDistance && creature->GetInstanceId() == 0) ? (creature->CanFly() ? MIN_WANDER_DISTANCE_AIR : MIN_WANDER_DISTANCE_GROUND) : 0.0f, _wanderDistance);
 
     if (G3D::fuzzyEq(_initialPosition.GetExactDist2d(0.0f, 0.0f), 0.0f))
     {

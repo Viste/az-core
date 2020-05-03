@@ -1,17 +1,17 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
 
 #include "DatabaseEnv.h"
 #include "Log.h"
-#include "World.h"
 #include "Util.h"
 #include "SkillDiscovery.h"
 #include "SpellMgr.h"
 #include "Player.h"
 #include "SpellInfo.h"
+#include "GameConfig.h"
 #include <map>
 
 struct SkillDiscoveryEntry
@@ -211,7 +211,7 @@ uint32 GetSkillDiscoverySpell(uint32 skillId, uint32 spellId, Player* player)
     {
         for (SkillDiscoveryList::const_iterator item_iter = tab->second.begin(); item_iter != tab->second.end(); ++item_iter)
         {
-            if (roll_chance_f(item_iter->chance * sWorld->getRate(RATE_SKILL_DISCOVERY)) &&
+            if (roll_chance_f(item_iter->chance * sGameConfig->GetFloatConfig("Rate.Skill.Discovery")) &&
                 item_iter->reqSkillValue <= skillvalue &&
                 !player->HasSpell(item_iter->spellId))
                 return item_iter->spellId;
@@ -229,7 +229,7 @@ uint32 GetSkillDiscoverySpell(uint32 skillId, uint32 spellId, Player* player)
     {
         for (SkillDiscoveryList::const_iterator item_iter = tab->second.begin(); item_iter != tab->second.end(); ++item_iter)
         {
-            if (roll_chance_f(item_iter->chance * sWorld->getRate(RATE_SKILL_DISCOVERY)) &&
+            if (roll_chance_f(item_iter->chance * sGameConfig->GetFloatConfig("Rate.Skill.Discovery")) &&
                 item_iter->reqSkillValue <= skillvalue &&
                 !player->HasSpell(item_iter->spellId))
                 return item_iter->spellId;

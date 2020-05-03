@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -15,6 +15,8 @@
 #include "UpdateData.h"
 #include "ObjectAccessor.h"
 #include "SpellInfo.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
 
 void WorldSession::HandleSplitItemOpcode(WorldPacket & recvData)
 {
@@ -443,10 +445,10 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recvData)
      int loc_idx = GetSessionDbLocaleIndex();
      if (loc_idx >= 0)
      {
-         if (ItemLocale const* il = sObjectMgr->GetItemLocale(pProto->ItemId))
+         if (ItemLocale const* il = sGameLocale->GetItemLocale(pProto->ItemId))
          {
-             ObjectMgr::GetLocaleString(il->Name, loc_idx, Name);
-             ObjectMgr::GetLocaleString(il->Description, loc_idx, Description);
+             sGameLocale->GetLocaleString(il->Name, loc_idx, Name);
+             sGameLocale->GetLocaleString(il->Description, loc_idx, Description);
          }
      }
      // guess size
@@ -579,7 +581,7 @@ void WorldSession::HandleItemQuerySingleOpcode(WorldPacket & recvData)
     else
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_ITEM_QUERY_SINGLE - NO item INFO! (ENTRY: %u)", item);
+        LOG_DEBUG("network", "WORLD: CMSG_ITEM_QUERY_SINGLE - NO item INFO! (ENTRY: %u)", item);
 #endif
         WorldPacket queryData(SMSG_ITEM_QUERY_SINGLE_RESPONSE, 4);
         queryData << uint32(item | 0x80000000);
@@ -627,7 +629,7 @@ void WorldSession::HandleReadItem(WorldPacket & recvData)
 void WorldSession::HandleSellItemOpcode(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_SELL_ITEM");
+    LOG_DEBUG("network", "WORLD: Received CMSG_SELL_ITEM");
 #endif
     uint64 vendorguid, itemguid;
     uint32 count;
@@ -641,7 +643,7 @@ void WorldSession::HandleSellItemOpcode(WorldPacket & recvData)
     if (!creature)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: HandleSellItemOpcode - Unit (GUID: %u) not found or you can not interact with him.", uint32(GUID_LOPART(vendorguid)));
+        LOG_DEBUG("network", "WORLD: HandleSellItemOpcode - Unit (GUID: %u) not found or you can not interact with him.", uint32(GUID_LOPART(vendorguid)));
 #endif
         _player->SendSellError(SELL_ERR_CANT_FIND_VENDOR, NULL, itemguid, 0);
         return;
@@ -701,7 +703,7 @@ void WorldSession::HandleSellItemOpcode(WorldPacket & recvData)
         {
             if (pProto->SellPrice > 0)
             {
-                if (sWorld->getBoolConfig(CONFIG_ITEMDELETE_VENDOR))
+                if (sGameConfig->GetBoolConfig("ItemDelete.Vendor"))
                     recoveryItem(pItem);
 
                 if (count < pItem->GetCount())               // need split items
@@ -749,7 +751,7 @@ void WorldSession::HandleSellItemOpcode(WorldPacket & recvData)
 void WorldSession::HandleBuybackItem(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_BUYBACK_ITEM");
+    LOG_DEBUG("network", "WORLD: Received CMSG_BUYBACK_ITEM");
 #endif
     uint64 vendorguid;
     uint32 slot;
@@ -760,7 +762,7 @@ void WorldSession::HandleBuybackItem(WorldPacket & recvData)
     if (!creature)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: HandleBuybackItem - Unit (GUID: %u) not found or you can not interact with him.", uint32(GUID_LOPART(vendorguid)));
+        LOG_DEBUG("network", "WORLD: HandleBuybackItem - Unit (GUID: %u) not found or you can not interact with him.", uint32(GUID_LOPART(vendorguid)));
 #endif
         _player->SendSellError(SELL_ERR_CANT_FIND_VENDOR, NULL, 0, 0);
         return;
@@ -784,7 +786,7 @@ void WorldSession::HandleBuybackItem(WorldPacket & recvData)
         InventoryResult msg = _player->CanStoreItem(NULL_BAG, NULL_SLOT, dest, pItem, false);
         if (msg == EQUIP_ERR_OK)
         {
-            if (sWorld->getBoolConfig(CONFIG_ITEMDELETE_VENDOR))
+            if (sGameConfig->GetBoolConfig("ItemDelete.Vendor"))
             {
                 PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_RECOVERY_ITEM);
                 stmt->setUInt32(0, _player->GetGUID());
@@ -810,7 +812,7 @@ void WorldSession::HandleBuybackItem(WorldPacket & recvData)
 void WorldSession::HandleBuyItemInSlotOpcode(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_BUY_ITEM_IN_SLOT");
+    LOG_DEBUG("network", "WORLD: Received CMSG_BUY_ITEM_IN_SLOT");
 #endif
     uint64 vendorguid, bagguid;
     uint32 item, slot, count;
@@ -854,7 +856,7 @@ void WorldSession::HandleBuyItemInSlotOpcode(WorldPacket & recvData)
 void WorldSession::HandleBuyItemOpcode(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_BUY_ITEM");
+    LOG_DEBUG("network", "WORLD: Received CMSG_BUY_ITEM");
 #endif
     uint64 vendorguid;
     uint32 item, slot, count;
@@ -881,7 +883,7 @@ void WorldSession::HandleListInventoryOpcode(WorldPacket & recvData)
         return;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd CMSG_LIST_INVENTORY");
+    LOG_DEBUG("network", "WORLD: Recvd CMSG_LIST_INVENTORY");
 #endif
 
     SendListInventory(guid);
@@ -890,14 +892,14 @@ void WorldSession::HandleListInventoryOpcode(WorldPacket & recvData)
 void WorldSession::SendListInventory(uint64 vendorGuid)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Sent SMSG_LIST_INVENTORY");
+    LOG_DEBUG("network", "WORLD: Sent SMSG_LIST_INVENTORY");
 #endif
 
     Creature* vendor = GetPlayer()->GetNPCIfCanInteractWith(vendorGuid, UNIT_NPC_FLAG_VENDOR);
     if (!vendor)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: SendListInventory - Unit (GUID: %u) not found or you can not interact with him.", uint32(GUID_LOPART(vendorGuid)));
+        LOG_DEBUG("network", "WORLD: SendListInventory - Unit (GUID: %u) not found or you can not interact with him.", uint32(GUID_LOPART(vendorGuid)));
 #endif
         _player->SendSellError(SELL_ERR_CANT_FIND_VENDOR, NULL, 0, 0);
         return;
@@ -955,7 +957,7 @@ void WorldSession::SendListInventory(uint64 vendorGuid)
                 if (!sConditionMgr->IsObjectMeetToConditions(_player, vendor, conditions))
                 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                    sLog->outDebug(LOG_FILTER_NETWORKIO, "SendListInventory: conditions not met for creature entry %u item %u", vendor->GetEntry(), item->item);
+                    LOG_DEBUG("network", "SendListInventory: conditions not met for creature entry %u item %u", vendor->GetEntry(), item->item);
 #endif
                     continue;
                 }
@@ -1044,7 +1046,7 @@ void WorldSession::HandleAutoStoreBagItemOpcode(WorldPacket & recvData)
 void WorldSession::HandleBuyBankSlotOpcode(WorldPacket& recvPacket)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_BUY_BANK_SLOT");
+    LOG_DEBUG("network", "WORLD: CMSG_BUY_BANK_SLOT");
 #endif
 
     uint64 guid;
@@ -1097,13 +1099,13 @@ void WorldSession::HandleBuyBankSlotOpcode(WorldPacket& recvPacket)
 void WorldSession::HandleAutoBankItemOpcode(WorldPacket& recvPacket)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_AUTOBANK_ITEM");
+    LOG_DEBUG("network", "WORLD: CMSG_AUTOBANK_ITEM");
 #endif
     uint8 srcbag, srcslot;
 
     recvPacket >> srcbag >> srcslot;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE: receive srcbag = %u, srcslot = %u", srcbag, srcslot);
+    LOG_DEBUG("network", "STORAGE: receive srcbag = %u, srcslot = %u", srcbag, srcslot);
 #endif
 
     if (!CanUseBank())
@@ -1139,13 +1141,13 @@ void WorldSession::HandleAutoBankItemOpcode(WorldPacket& recvPacket)
 void WorldSession::HandleAutoStoreBankItemOpcode(WorldPacket& recvPacket)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_AUTOSTORE_BANK_ITEM");
+    LOG_DEBUG("network", "WORLD: CMSG_AUTOSTORE_BANK_ITEM");
 #endif
     uint8 srcbag, srcslot;
 
     recvPacket >> srcbag >> srcslot;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "STORAGE: receive srcbag = %u, srcslot = %u", srcbag, srcslot);
+    LOG_DEBUG("network", "STORAGE: receive srcbag = %u, srcslot = %u", srcbag, srcslot);
 #endif
 
     if (!CanUseBank())
@@ -1197,7 +1199,7 @@ void WorldSession::HandleSetAmmoOpcode(WorldPacket & recvData)
     }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_SET_AMMO");
+    LOG_DEBUG("network", "WORLD: CMSG_SET_AMMO");
 #endif
     uint32 item;
 
@@ -1245,7 +1247,7 @@ void WorldSession::HandleItemNameQueryOpcode(WorldPacket & recvData)
     recvData.read_skip<uint64>();                          // guid
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_ITEM_NAME_QUERY %u", itemid);
+    LOG_DEBUG("network", "WORLD: CMSG_ITEM_NAME_QUERY %u", itemid);
 #endif
     ItemSetNameEntry const* pName = sObjectMgr->GetItemSetNameEntry(itemid);
     if (pName)
@@ -1253,8 +1255,8 @@ void WorldSession::HandleItemNameQueryOpcode(WorldPacket & recvData)
         std::string Name = pName->name;
         LocaleConstant loc_idx = GetSessionDbLocaleIndex();
         if (loc_idx >= 0)
-            if (ItemSetNameLocale const* isnl = sObjectMgr->GetItemSetNameLocale(itemid))
-                ObjectMgr::GetLocaleString(isnl->Name, loc_idx, Name);
+            if (ItemSetNameLocale const* isnl = sGameLocale->GetItemSetNameLocale(itemid))
+                sGameLocale->GetLocaleString(isnl->Name, loc_idx, Name);
 
         WorldPacket data(SMSG_ITEM_NAME_QUERY_RESPONSE, (4+Name.size()+1+4));
         data << uint32(itemid);
@@ -1267,7 +1269,7 @@ void WorldSession::HandleItemNameQueryOpcode(WorldPacket & recvData)
 void WorldSession::HandleWrapItemOpcode(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "Received opcode CMSG_WRAP_ITEM");
+    LOG_DEBUG("network", "Received opcode CMSG_WRAP_ITEM");
 #endif
 
     uint8 gift_bag, gift_slot, item_bag, item_slot;
@@ -1276,7 +1278,7 @@ void WorldSession::HandleWrapItemOpcode(WorldPacket& recvData)
     recvData >> item_bag >> item_slot;                     // item
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WRAP: receive gift_bag = %u, gift_slot = %u, item_bag = %u, item_slot = %u", gift_bag, gift_slot, item_bag, item_slot);
+    LOG_DEBUG("network", "WRAP: receive gift_bag = %u, gift_slot = %u, item_bag = %u, item_slot = %u", gift_bag, gift_slot, item_bag, item_slot);
 #endif
 
     Item* gift = _player->GetItemByPos(gift_bag, gift_slot);
@@ -1386,7 +1388,7 @@ void WorldSession::HandleWrapItemOpcode(WorldPacket& recvData)
 void WorldSession::HandleSocketOpcode(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_SOCKET_GEMS");
+    LOG_DEBUG("network", "WORLD: CMSG_SOCKET_GEMS");
 #endif
 
     uint64 item_guid;
@@ -1559,7 +1561,11 @@ void WorldSession::HandleSocketOpcode(WorldPacket& recvData)
         {
             itemTarget->SetEnchantment(EnchantmentSlot(SOCK_ENCHANTMENT_SLOT+i), GemEnchants[i], 0, 0, _player->GetGUID());
             if (Item* guidItem = _player->GetItemByGuid(gem_guids[i]))
-                _player->DestroyItem(guidItem->GetBagSlot(), guidItem->GetSlot(), true);
+            {
+                uint32 count = 1;
+                _player->DestroyItemCount(guidItem, count, true);
+                // _player->DestroyItem(guidItem->GetBagSlot(), guidItem->GetSlot(), true);
+            }
         }
     }
 
@@ -1586,7 +1592,7 @@ void WorldSession::HandleSocketOpcode(WorldPacket& recvData)
 void WorldSession::HandleCancelTempEnchantmentOpcode(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_CANCEL_TEMP_ENCHANTMENT");
+    LOG_DEBUG("network", "WORLD: CMSG_CANCEL_TEMP_ENCHANTMENT");
 #endif
 
     uint32 eslot;
@@ -1612,7 +1618,7 @@ void WorldSession::HandleCancelTempEnchantmentOpcode(WorldPacket& recvData)
 void WorldSession::HandleItemRefundInfoRequest(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_ITEM_REFUND_INFO");
+    LOG_DEBUG("network", "WORLD: CMSG_ITEM_REFUND_INFO");
 #endif
 
     uint64 guid;
@@ -1622,7 +1628,7 @@ void WorldSession::HandleItemRefundInfoRequest(WorldPacket& recvData)
     if (!item)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "Item refund: item not found!");
+        LOG_DEBUG("network", "Item refund: item not found!");
 #endif
         return;
     }
@@ -1633,7 +1639,7 @@ void WorldSession::HandleItemRefundInfoRequest(WorldPacket& recvData)
 void WorldSession::HandleItemRefund(WorldPacket &recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_ITEM_REFUND");
+    LOG_DEBUG("network", "WORLD: CMSG_ITEM_REFUND");
 #endif
     uint64 guid;
     recvData >> guid;                                      // item guid
@@ -1642,7 +1648,7 @@ void WorldSession::HandleItemRefund(WorldPacket &recvData)
     if (!item)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "Item refund: item not found!");
+        LOG_DEBUG("network", "Item refund: item not found!");
 #endif
         return;
     }
@@ -1665,7 +1671,7 @@ void WorldSession::HandleItemTextQuery(WorldPacket & recvData )
     recvData >> itemGuid;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "CMSG_ITEM_TEXT_QUERY item guid: %u", GUID_LOPART(itemGuid));
+    LOG_DEBUG("network", "CMSG_ITEM_TEXT_QUERY item guid: %u", GUID_LOPART(itemGuid));
 #endif
 
     WorldPacket data(SMSG_ITEM_TEXT_QUERY_RESPONSE, 50);        // guess size
@@ -1704,9 +1710,9 @@ bool WorldSession::CanUseBank(uint64 bankerGUID) const
 
 bool WorldSession::recoveryItem(Item* pItem)
 {
-    if (sWorld->getBoolConfig(CONFIG_ITEMDELETE_METHOD)
-        && pItem->GetTemplate()->Quality >= sWorld->getIntConfig(CONFIG_ITEMDELETE_QUALITY)
-        && pItem->GetTemplate()->ItemLevel >= sWorld->getIntConfig(CONFIG_ITEMDELETE_ITEM_LEVEL))
+    if (sGameConfig->GetBoolConfig("ItemDelete.Method")
+        && pItem->GetTemplate()->Quality >= sGameConfig->GetIntConfig("ItemDelete.Quality")
+        && pItem->GetTemplate()->ItemLevel >= sGameConfig->GetIntConfig("ItemDelete.ItemLevel"))
     {
         PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_RECOVERY_ITEM);
 

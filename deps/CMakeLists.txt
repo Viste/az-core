@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU AGPL3 v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
+# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -19,6 +19,9 @@ endif()
 add_subdirectory(threads)
 add_subdirectory(acelite)
 add_subdirectory(fmt)
+add_subdirectory(poco)
+add_subdirectory(boost)
+add_subdirectory(process)
 
 if(SERVERS OR TOOLS)
   add_subdirectory(zlib)

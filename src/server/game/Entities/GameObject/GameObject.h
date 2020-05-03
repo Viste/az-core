@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -591,12 +591,6 @@ union GameObjectValue
     } Building;
 };
 
-struct GameObjectLocale
-{
-    StringVector Name;
-    StringVector CastBarCaption;
-};
-
 // `gameobject_addon` table
 struct GameObjectAddon
 {
@@ -718,20 +712,9 @@ class GameObject : public WorldObject, public GridObject<GameObject>, public Mov
         uint32 GetSpellId() const { return m_spellId;}
 
         time_t GetRespawnTime() const { return m_respawnTime; }
-        time_t GetRespawnTimeEx() const
-        {
-            time_t now = time(NULL);
-            if (m_respawnTime > now)
-                return m_respawnTime;
-            else
-                return now;
-        }
+        time_t GetRespawnTimeEx() const;
 
-        void SetRespawnTime(int32 respawn)
-        {
-            m_respawnTime = respawn > 0 ? time(NULL) + respawn : 0;
-            m_respawnDelayTime = respawn > 0 ? respawn : 0;
-        }
+        void SetRespawnTime(int32 respawn);
         void Respawn();
         bool isSpawned() const
         {
@@ -800,7 +783,7 @@ class GameObject : public WorldObject, public GridObject<GameObject>, public Mov
         bool HasLootRecipient() const { return m_lootRecipient || m_lootRecipientGroup; }
         uint32 m_groupLootTimer;                            // (msecs)timer used for group loot
         uint32 lootingGroupLowGUID;                         // used to find group which is looting
-        void SetLootGenerationTime() { m_lootGenerationTime = time(NULL); }
+        void SetLootGenerationTime();
         uint32 GetLootGenerationTime() const { return m_lootGenerationTime; }
 
         bool hasQuest(uint32 quest_id) const override;
@@ -885,6 +868,7 @@ class GameObject : public WorldObject, public GridObject<GameObject>, public Mov
 
     protected:
         bool AIM_Initialize();
+        GameObjectModel* CreateModel();
         void UpdateModel();                                 // updates model in case displayId were changed
         uint32      m_spellId;
         time_t      m_respawnTime;                          // (secs) time of next respawn (or despawn if GO have owner()),

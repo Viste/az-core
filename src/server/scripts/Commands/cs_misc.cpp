@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -28,6 +28,9 @@
 #include "BattlegroundMgr.h"
 #include "MapManager.h"
 #include "GameGraveyard.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
 
 class misc_commandscript : public CommandScript
 {
@@ -689,7 +692,7 @@ public:
             else if (map->IsDungeon())
             {
                 // Allow GM to summon players or only other GM accounts inside instances.
-                if (!sWorld->getBoolConfig(CONFIG_INSTANCE_GMSUMMON_PLAYER))
+                if (!sGameConfig->GetIntConfig("Instance.GMSummonPlayer"))
                 {
                     // pussywizard: prevent unbinding normal player's perm bind by just summoning him >_>
                     if (!target->GetSession()->GetSecurity())
@@ -876,7 +879,7 @@ public:
 
         if (target->IsAlive())
         {
-            if (sWorld->getBoolConfig(CONFIG_DIE_COMMAND_MODE))
+            if (sGameConfig->GetBoolConfig("Die.Command.Mode"))
             {
                 if (target->GetTypeId() == TYPEID_UNIT && handler->GetSession()->GetSecurity() == SEC_CONSOLE) // pussywizard
                     target->ToCreature()->LowerPlayerDamageReq(target->GetMaxHealth());
@@ -1129,8 +1132,16 @@ public:
         if (handler->HasLowerSecurity(target, 0))
             return false;
 
-        if (sWorld->getBoolConfig(CONFIG_SHOW_KICK_IN_WORLD))
-            sWorld->SendWorldText(LANG_COMMAND_KICKMESSAGE, playerName.c_str());
+        std::string kickReasonStr = handler->GetAcoreString(LANG_NO_REASON);
+        if (*args != '\0')
+        {
+            char const* kickReason = strtok(nullptr, "\r");
+            if (kickReason != nullptr)
+                kickReasonStr = kickReason;
+        }
+
+        if (sGameConfig->GetBoolConfig("ShowKickInWorld"))
+            sWorld->SendWorldText(LANG_COMMAND_KICKMESSAGE_WORLD, (handler->GetSession() ? handler->GetSession()->GetPlayerName().c_str() : "Server"), playerName.c_str(), kickReasonStr.c_str());
         else
             handler->PSendSysMessage(LANG_COMMAND_KICKMESSAGE, playerName.c_str());
 
@@ -1627,7 +1638,7 @@ public:
             return false;
 
         // Weather is OFF
-        if (!sWorld->getBoolConfig(CONFIG_WEATHER))
+        if (!sGameConfig->GetBoolConfig("ActivateWeather"))
         {
             handler->SendSysMessage(LANG_WEATHER_DISABLED);
             handler->SetSentErrorMessage(true);
@@ -1992,11 +2003,11 @@ public:
 
         // Output III. LANG_PINFO_BANNED if ban exists and is applied
         if (banTime >= 0)
-            handler->PSendSysMessage(LANG_PINFO_BANNED, banType.c_str(), banReason.c_str(), banTime > 0 ? secsToTimeString(banTime - time(nullptr), true).c_str() : handler->GetAcoreString(LANG_PERMANENTLY), bannedBy.c_str());
+            handler->PSendSysMessage(LANG_PINFO_BANNED, banType.c_str(), banReason.c_str(), banTime > 0 ? secsToTimeString(banTime - GameTime::GetGameTime(), true).c_str() : handler->GetAcoreString(LANG_PERMANENTLY), bannedBy.c_str());
 
         // Output IV. LANG_PINFO_MUTED if mute is applied
         if (muteTime > 0)
-            handler->PSendSysMessage(LANG_PINFO_MUTED, muteReason.c_str(), secsToTimeString(muteTime - time(nullptr), true).c_str(), muteBy.c_str());
+            handler->PSendSysMessage(LANG_PINFO_MUTED, muteReason.c_str(), secsToTimeString(muteTime - GameTime::GetGameTime(), true).c_str(), muteBy.c_str());
 
         // Output V. LANG_PINFO_ACC_ACCOUNT
         handler->PSendSysMessage(LANG_PINFO_ACC_ACCOUNT, userName.c_str(), accId, security);
@@ -2014,80 +2025,14 @@ public:
         handler->PSendSysMessage(LANG_PINFO_ACC_IP, lastIp.c_str(), locked ? handler->GetAcoreString(LANG_YES) : handler->GetAcoreString(LANG_NO));
 
         // Output X. LANG_PINFO_CHR_LEVEL
-        if (level != sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+        if (level != sGameConfig->GetIntConfig("MaxPlayerLevel"))
             handler->PSendSysMessage(LANG_PINFO_CHR_LEVEL_LOW, level, xp, xptotal, (xptotal - xp));
         else
             handler->PSendSysMessage(LANG_PINFO_CHR_LEVEL_HIGH, level);
 
         // Output XI. LANG_PINFO_CHR_RACE
-		switch (raceid)
-        {
-            case RACE_HUMAN:
-                raceStr = "Human";
-                break;
-            case RACE_ORC:
-                raceStr = "Orc";
-                break;
-            case RACE_DWARF:
-                raceStr = "Dwarf";
-                break;
-            case RACE_NIGHTELF:
-                raceStr = "Night Elf";
-                break;
-            case RACE_UNDEAD_PLAYER:
-                raceStr = "Undead";
-                break;
-            case RACE_TAUREN:
-                raceStr = "Tauren";
-                break;
-            case RACE_GNOME:
-                raceStr = "Gnome";
-                break;
-            case RACE_TROLL:
-                raceStr = "Troll";
-                break;
-            case RACE_BLOODELF:
-                raceStr = "Blood Elf";
-                break;
-            case RACE_DRAENEI:
-                raceStr = "Draenei";
-                break;
-        }
-
-        switch (classid)
-        {
-            case CLASS_WARRIOR:
-                classStr = "Warrior";
-                break;
-            case CLASS_PALADIN:
-                classStr = "Paladin";
-                break;
-            case CLASS_HUNTER:
-                classStr = "Hunter";
-                break;
-            case CLASS_ROGUE:
-                classStr = "Rogue";
-                break;
-            case CLASS_PRIEST:
-                classStr = "Priest";
-                break;
-            case CLASS_DEATH_KNIGHT:
-                classStr = "Death Knight";
-                break;
-            case CLASS_SHAMAN:
-                classStr = "Shaman";
-                break;
-            case CLASS_MAGE:
-                classStr = "Mage";
-                break;
-            case CLASS_WARLOCK:
-                classStr = "Warlock";
-                break;
-            case CLASS_DRUID:
-                classStr = "Druid";
-                break;
-        }
-
+        raceStr = sGameLocale->GetRaseString(raceid)->GetText(handler->GetSessionDbcLocale(), gender);
+        classStr = sGameLocale->GetClassString(classid)->GetText(handler->GetSessionDbcLocale(), gender);
 
         handler->PSendSysMessage(LANG_PINFO_CHR_RACE, (gender == 0 ? handler->GetAcoreString(LANG_CHARACTER_GENDER_MALE) : handler->GetAcoreString(LANG_CHARACTER_GENDER_FEMALE)), raceStr.c_str(), classStr.c_str());
 
@@ -2202,7 +2147,7 @@ public:
             return false;
 
         char const* muteReason = strtok(nullptr, "\r");
-        std::string muteReasonStr = "No reason";
+        std::string muteReasonStr = handler->GetAcoreString(LANG_NO_REASON);
         if (muteReason != nullptr)
             muteReasonStr = muteReason;
 
@@ -2230,14 +2175,19 @@ public:
         if (handler->GetSession())
             muteBy = handler->GetSession()->GetPlayerName();
         else
-            muteBy = "Console";
+            muteBy = handler->GetAcoreString(LANG_CONSOLE);
 
         if (target)
         {
             // Target is online, mute will be in effect right away.
-            int64 muteTime = time(nullptr) + notSpeakTime * MINUTE;
+            int64 muteTime = GameTime::GetGameTime() + notSpeakTime * MINUTE;
             target->GetSession()->m_muteTime = muteTime;
             stmt->setInt64(0, muteTime);
+            std::string nameLink = handler->playerLink(targetName);
+
+            if (CONF_GET_BOOL("ShowMuteInWorld"))
+                sWorld->SendWorldText(LANG_COMMAND_MUTEMESSAGE_WORLD, muteBy.c_str(), nameLink.c_str(), notSpeakTime, muteReasonStr.c_str());
+
             ChatHandler(target->GetSession()).PSendSysMessage(LANG_YOUR_CHAT_DISABLED, notSpeakTime, muteBy.c_str(), muteReasonStr.c_str());
         }
         else
@@ -2247,25 +2197,29 @@ public:
             stmt->setInt64(0, muteTime);
         }
 
-        stmt->setString(1, muteReasonStr.c_str());
-        stmt->setString(2, muteBy.c_str());
+        stmt->setString(1, muteReasonStr);
+        stmt->setString(2, muteBy);
         stmt->setUInt32(3, accountId);
         LoginDatabase.Execute(stmt);
         stmt = LoginDatabase.GetPreparedStatement(LOGIN_INS_ACCOUNT_MUTE);
         stmt->setUInt32(0, accountId);
         stmt->setUInt32(1, notSpeakTime);
-        stmt->setString(2, muteBy.c_str());
-        stmt->setString(3, muteReasonStr.c_str());
+        stmt->setString(2, muteBy);
+        stmt->setString(3, muteReasonStr);
         LoginDatabase.Execute(stmt);
-
         std::string nameLink = handler->playerLink(targetName);
 
-        // pussywizard: notify all online GMs
-        ACORE_READ_GUARD(HashMapHolder<Player>::LockType, *HashMapHolder<Player>::GetLock());
-        HashMapHolder<Player>::MapType const& m = sObjectAccessor->GetPlayers();
-        for (HashMapHolder<Player>::MapType::const_iterator itr = m.begin(); itr != m.end(); ++itr)
-            if (itr->second->GetSession()->GetSecurity())
-                ChatHandler(itr->second->GetSession()).PSendSysMessage(target ? LANG_YOU_DISABLE_CHAT : LANG_COMMAND_DISABLE_CHAT_DELAYED, (handler->GetSession() ? handler->GetSession()->GetPlayerName().c_str() : "Console"), nameLink.c_str(), notSpeakTime, muteReasonStr.c_str());
+        if (CONF_GET_BOOL("ShowMuteInWorld") && !target)
+            sWorld->SendWorldText(LANG_COMMAND_MUTEMESSAGE_WORLD, muteBy.c_str(), nameLink.c_str(), notSpeakTime, muteReasonStr.c_str());
+        else
+        {
+            // pussywizard: notify all online GMs
+            ACORE_READ_GUARD(HashMapHolder<Player>::LockType, *HashMapHolder<Player>::GetLock());
+            HashMapHolder<Player>::MapType const& m = sObjectAccessor->GetPlayers();
+            for (HashMapHolder<Player>::MapType::const_iterator itr = m.begin(); itr != m.end(); ++itr)
+                if (itr->second->GetSession()->GetSecurity())
+                    ChatHandler(itr->second->GetSession()).PSendSysMessage(target ? LANG_YOU_DISABLE_CHAT : LANG_COMMAND_DISABLE_CHAT_DELAYED, (handler->GetSession() ? handler->GetSession()->GetPlayerName().c_str() : handler->GetAcoreString(LANG_CONSOLE)), nameLink.c_str(), notSpeakTime, muteReasonStr.c_str());
+        }
 
         return true;
     }

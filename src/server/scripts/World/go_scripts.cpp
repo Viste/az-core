@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -39,6 +39,7 @@ EndContentData */
 #include "WorldSession.h"
 #include "GridNotifiersImpl.h"
 #include "CellImpl.h"
+#include "GameTime.h"
 
 // Ours
 /*######
@@ -931,7 +932,7 @@ class go_inconspicuous_landmark : public GameObjectScript
     public:
         go_inconspicuous_landmark() : GameObjectScript("go_inconspicuous_landmark")
         {
-            _lastUsedTime = time(NULL);
+            _lastUsedTime = GameTime::GetGameTime();
         }
 
         bool OnGossipHello(Player* player, GameObject* /*go*/) override
@@ -939,10 +940,10 @@ class go_inconspicuous_landmark : public GameObjectScript
             if (player->HasItemCount(ITEM_CUERGOS_KEY))
                 return true;
 
-            if (_lastUsedTime > time(NULL))
+            if (_lastUsedTime > GameTime::GetGameTime())
                 return true;
 
-            _lastUsedTime = time(NULL) + MINUTE;
+            _lastUsedTime = GameTime::GetGameTime() + MINUTE;
             player->CastSpell(player, SPELL_SUMMON_PIRATES_TREASURE_AND_TRIGGER_MOB, true);
             return true;
         }

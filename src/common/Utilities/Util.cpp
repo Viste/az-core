@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -8,10 +8,9 @@
 #include "Common.h"
 #include "utf8.h"
 #include "Log.h"
-#include "DatabaseWorker.h"
-#include "SQLOperation.h"
 #include "Errors.h"
 #include "TypeList.h"
+#include <ace/Task.h>
 #include "SFMT.h"
 #include "Errors.h" // for ASSERT
 #include <ace/TSS_T.h>

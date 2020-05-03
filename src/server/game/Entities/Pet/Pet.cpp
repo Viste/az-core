@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -22,6 +22,7 @@
 #include "Battleground.h"
 #include "InstanceScript.h"
 #include "ArenaSpectator.h"
+#include "GameLocale.h"
 
 #define PET_XP_FACTOR 0.05f
 
@@ -289,7 +290,7 @@ void Pet::SavePetToDB(PetSaveMode mode, bool logout)
         stmt->setUInt32(12, curhealth);
         stmt->setUInt32(13, curmana);
         stmt->setUInt32(14, GetPower(POWER_HAPPINESS));
-        stmt->setUInt32(15, time(NULL));
+        stmt->setUInt32(15, GameTime::GetGameTime());
 
         std::ostringstream ss;
         for (uint32 i = ACTION_BAR_INDEX_START; i < ACTION_BAR_INDEX_END; ++i)
@@ -373,7 +374,7 @@ void Pet::Update(uint32 diff)
     {
         case CORPSE:
         {
-            if (getPetType() != HUNTER_PET || m_corpseRemoveTime <= time(NULL))
+            if (getPetType() != HUNTER_PET || m_corpseRemoveTime <= GameTime::GetGameTime())
             {
                 Remove(PET_SAVE_NOT_IN_SLOT);               //hunters' pets never get removed because of death, NEVER!
                 return;
@@ -443,6 +444,8 @@ void Pet::Update(uint32 diff)
                     if (!spellInfo)
                         return;
                     float max_range = GetSpellMaxRangeForTarget(tempspellTarget, spellInfo);
+                    if (spellInfo->RangeEntry->type == SPELL_RANGE_MELEE)
+                        max_range -= 2*MIN_MELEE_REACH;
 
                     if (IsWithinLOSInMap(tempspellTarget) && GetDistance(tempspellTarget) < max_range)
                     {
@@ -589,7 +592,7 @@ void Pet::GivePetXP(uint32 xp)
     if (!IsAlive())
         return;
 
-    uint8 maxlevel = std::min((uint8)sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL), GetOwner()->getLevel());
+    uint8 maxlevel = std::min((uint8)sGameConfig->GetIntConfig("MaxPlayerLevel"), GetOwner()->getLevel());
     uint8 petlevel = getLevel();
 
     // If pet is detected to be at, or above(?) the players level, don't hand out XP
@@ -659,7 +662,7 @@ bool Pet::CreateBaseAtCreature(Creature* creature)
     if (CreatureFamilyEntry const* cFamily = sCreatureFamilyStore.LookupEntry(cinfo->family))
         SetName(cFamily->Name[sWorld->GetDefaultDbcLocale()]);
     else
-        SetName(creature->GetNameForLocaleIdx(sObjectMgr->GetDBCLocaleIndex()));
+        SetName(creature->GetNameForLocaleIdx(sGameLocale->GetDBCLocaleIndex()));
 
     return true;
 }
@@ -680,7 +683,7 @@ bool Pet::CreateBaseAtCreatureInfo(CreatureTemplate const* cinfo, Unit* owner)
 bool Pet::CreateBaseAtTamed(CreatureTemplate const* cinfo, Map* map, uint32 phaseMask)
 { 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_PETS, "Pet::CreateBaseForTamed");
+    LOG_DEBUG("entities.pets", "Pet::CreateBaseForTamed");
 #endif
     uint32 guid=sObjectMgr->GenerateLowGuid(HIGHGUID_PET);
     uint32 pet_number = sObjectMgr->GeneratePetNumber();
@@ -1126,7 +1129,7 @@ void Pet::_LoadSpellCooldowns(PreparedQueryResult result)
 
     if (result)
     {
-        time_t curTime = time(NULL);
+        time_t curTime = GameTime::GetGameTime();
 
         PacketCooldowns cooldowns;
         WorldPacket data;
@@ -1153,7 +1156,7 @@ void Pet::_LoadSpellCooldowns(PreparedQueryResult result)
             _AddCreatureSpellCooldown(spell_id, cooldown);
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_PETS, "Pet (Number: %u) spell %u cooldown loaded (%u secs).", m_charmInfo->GetPetNumber(), spell_id, uint32(db_time-curTime));
+            LOG_DEBUG("entities.pets", "Pet (Number: %u) spell %u cooldown loaded (%u secs).", m_charmInfo->GetPetNumber(), spell_id, uint32(db_time-curTime));
 #endif
         }
         while (result->NextRow());
@@ -1172,8 +1175,8 @@ void Pet::_SaveSpellCooldowns(SQLTransaction& trans, bool logout)
     stmt->setUInt32(0, m_charmInfo->GetPetNumber());
     trans->Append(stmt);
 
-    time_t curTime = time(NULL);
-    uint32 checkTime = World::GetGameTimeMS() + 30*IN_MILLISECONDS;
+    time_t curTime = GameTime::GetGameTime();
+    uint32 checkTime = GameTime::GetGameTimeMS() + 30*IN_MILLISECONDS;
 
     // remove oudated and save active
     CreatureSpellCooldowns::iterator itr, itr2;
@@ -1181,11 +1184,11 @@ void Pet::_SaveSpellCooldowns(SQLTransaction& trans, bool logout)
     {
         itr2 = itr;
         ++itr;
-        if (itr2->second <= World::GetGameTimeMS()+1000)
+        if (itr2->second <= GameTime::GetGameTimeMS()+1000)
             m_CreatureSpellCooldowns.erase(itr2);
         else if (logout || itr2->second > checkTime)
         {
-            uint32 cooldown = ((itr2->second-World::GetGameTimeMS())/IN_MILLISECONDS) + curTime;
+            uint32 cooldown = ((itr2->second-GameTime::GetGameTimeMS())/IN_MILLISECONDS) + curTime;
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_PET_SPELL_COOLDOWN);
             stmt->setUInt32(0, m_charmInfo->GetPetNumber());
             stmt->setUInt32(1, itr2->first);
@@ -1262,7 +1265,7 @@ void Pet::_SaveSpells(SQLTransaction& trans)
 void Pet::_LoadAuras(PreparedQueryResult result, uint32 timediff)
 { 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_PETS, "Loading auras for pet %u", GetGUIDLow());
+    LOG_DEBUG("entities.pets", "Loading auras for pet %u", GetGUIDLow());
 #endif
 
     if (result)
@@ -2213,7 +2216,7 @@ void Pet::HandleAsynchLoadFailed(AsynchPetSummon* info, Player* player, uint8 as
             pet->SetUInt32Value(UNIT_FIELD_PETNEXTLEVELEXP, 1000);
             pet->SetFullHealth();
             pet->SetPower(POWER_MANA, pet->GetMaxPower(POWER_MANA));
-            pet->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(time(NULL))); // cast can't be helped in this case
+            pet->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(GameTime::GetGameTime())); // cast can't be helped in this case
         }
 
         map->AddToMap(pet->ToCreature(), true);

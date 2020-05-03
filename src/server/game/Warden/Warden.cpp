@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -10,14 +10,15 @@
 #include "Log.h"
 #include "Opcodes.h"
 #include "ByteBuffer.h"
-#include <openssl/md5.h>
-#include <openssl/sha.h>
-#include "World.h"
 #include "Player.h"
 #include "Util.h"
 #include "Warden.h"
 #include "AccountMgr.h"
 #include "BanManager.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include <openssl/md5.h>
+#include <openssl/sha.h>
 
 Warden::Warden() : _session(NULL), _inputCrypto(16), _outputCrypto(16), _checkTimer(10000/*10 sec*/), _clientResponseTimer(0),
                    _dataSent(false), _previousTimestamp(0), _module(NULL), _initialized(false)
@@ -38,7 +39,7 @@ Warden::~Warden()
 void Warden::SendModuleToClient()
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_WARDEN, "Send module to client");
+    LOG_DEBUG("warden", "Send module to client");
 #endif
 
     // Create packet structure
@@ -66,7 +67,7 @@ void Warden::SendModuleToClient()
 void Warden::RequestModule()
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_WARDEN, "Request module");
+    LOG_DEBUG("warden", "Request module");
 #endif
 
     // Create packet structure
@@ -89,13 +90,13 @@ void Warden::Update()
 {
     if (_initialized)
     {
-        uint32 currentTimestamp = World::GetGameTimeMS();
+        uint32 currentTimestamp = GameTime::GetGameTimeMS();
         uint32 diff = getMSTimeDiff(_previousTimestamp, currentTimestamp);
         _previousTimestamp = currentTimestamp;
 
         if (_dataSent)
         {
-            uint32 maxClientResponseDelay = sWorld->getIntConfig(CONFIG_WARDEN_CLIENT_RESPONSE_DELAY);
+            uint32 maxClientResponseDelay = sGameConfig->GetIntConfig("Warden.ClientResponseDelay");
             if (maxClientResponseDelay > 0)
             {
                 if (_clientResponseTimer > maxClientResponseDelay * IN_MILLISECONDS)
@@ -131,14 +132,14 @@ bool Warden::IsValidCheckSum(uint32 checksum, const uint8* data, const uint16 le
     if (checksum != newChecksum)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_WARDEN, "CHECKSUM IS NOT VALID");
+        LOG_DEBUG("warden", "CHECKSUM IS NOT VALID");
 #endif
         return false;
     }
     else
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_WARDEN, "CHECKSUM IS VALID");
+        LOG_DEBUG("warden", "CHECKSUM IS VALID");
 #endif
         return true;
     }
@@ -177,7 +178,7 @@ std::string Warden::Penalty(WardenCheck* check /*= NULL*/, uint16 checkFailed /*
     if (check)
         action = check->Action;
     else
-        action = WardenActions(sWorld->getIntConfig(CONFIG_WARDEN_CLIENT_FAIL_ACTION));
+        action = WardenActions(sGameConfig->GetIntConfig("Warden.ClientCheckFailAction"));
 
     std::string banReason = "Anticheat violation";
     bool longBan = false; // 14d = 1209600s
@@ -225,7 +226,7 @@ std::string Warden::Penalty(WardenCheck* check /*= NULL*/, uint16 checkFailed /*
     case WARDEN_ACTION_BAN:
         {
             std::stringstream duration;
-            duration << sWorld->getIntConfig(CONFIG_WARDEN_CLIENT_BAN_DURATION) << "s";
+            duration << sGameConfig->GetIntConfig("Warden.BanDuration") << "s";
             std::string accountName;
             AccountMgr::GetName(_session->GetAccountId(), accountName);
             sBan->BanAccount(accountName, ((longBan && false /*ZOMG!*/) ? "1209600s" : duration.str()), banReason, "Server");
@@ -247,7 +248,7 @@ void WorldSession::HandleWardenDataOpcode(WorldPacket& recvData)
     uint8 opcode;
     recvData >> opcode;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_WARDEN, "Got packet, opcode %02X, size %u", opcode, uint32(recvData.size()));
+    LOG_DEBUG("warden", "Got packet, opcode %02X, size %u", opcode, uint32(recvData.size()));
 #endif
     recvData.hexlike();
 
@@ -264,7 +265,7 @@ void WorldSession::HandleWardenDataOpcode(WorldPacket& recvData)
             break;
         case WARDEN_CMSG_MEM_CHECKS_RESULT:
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_WARDEN, "NYI WARDEN_CMSG_MEM_CHECKS_RESULT received!");
+            LOG_DEBUG("warden", "NYI WARDEN_CMSG_MEM_CHECKS_RESULT received!");
 #endif
             break;
         case WARDEN_CMSG_HASH_RESULT:
@@ -273,12 +274,12 @@ void WorldSession::HandleWardenDataOpcode(WorldPacket& recvData)
             break;
         case WARDEN_CMSG_MODULE_FAILED:
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_WARDEN, "NYI WARDEN_CMSG_MODULE_FAILED received!");
+            LOG_DEBUG("warden", "NYI WARDEN_CMSG_MODULE_FAILED received!");
 #endif
             break;
         default:
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_WARDEN, "Got unknown warden opcode %02X of size %u.", opcode, uint32(recvData.size() - 1));
+            LOG_DEBUG("warden", "Got unknown warden opcode %02X of size %u.", opcode, uint32(recvData.size() - 1));
 #endif
             break;
     }

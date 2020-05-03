@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -17,7 +17,7 @@ namespace VMAP
     class GroupModel;
     class VMapManager2;
 
-    struct LocationInfo
+    struct AC_COMMON_API LocationInfo
     {
         LocationInfo(): hitInstance(0), hitModel(0), ground_Z(-G3D::inf()) { }
         const ModelInstance* hitInstance;
@@ -25,7 +25,7 @@ namespace VMAP
         float ground_Z;
     };
 
-    class StaticMapTree
+    class AC_COMMON_API StaticMapTree
     {
         typedef std::unordered_map<uint32, bool> loadedTileMap;
         typedef std::unordered_map<uint32, uint32> loadedSpawnMap;

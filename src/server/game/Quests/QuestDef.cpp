@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -208,7 +208,7 @@ int32 Quest::GetRewOrReqMoney() const
     if (RewardMoney <= 0)
         return RewardMoney;
 
-    return int32(RewardMoney  * sWorld->getRate(RATE_DROP_MONEY));
+    return int32(RewardMoney  * sGameConfig->GetFloatConfig("Rate.Drop.Money"));
 }
 
 uint32 Quest::GetRewMoneyMaxLevel() const
@@ -221,12 +221,12 @@ uint32 Quest::GetRewMoneyMaxLevel() const
 
 bool Quest::IsAutoAccept() const
 {
-    return sWorld->getBoolConfig(CONFIG_QUEST_IGNORE_AUTO_ACCEPT) ? false : (Flags & QUEST_FLAGS_AUTO_ACCEPT);
+    return sGameConfig->GetBoolConfig("Quests.IgnoreAutoAccept") ? false : (Flags & QUEST_FLAGS_AUTO_ACCEPT);
 }
 
 bool Quest::IsAutoComplete() const
 {
-    return sWorld->getBoolConfig(CONFIG_QUEST_IGNORE_AUTO_COMPLETE) ? false : (Method == 0 || HasFlag(QUEST_FLAGS_AUTOCOMPLETE));
+    return sGameConfig->GetBoolConfig("Quests.IgnoreAutoComplete") ? false : (Method == 0 || HasFlag(QUEST_FLAGS_AUTOCOMPLETE));
 }
 
 bool Quest::IsRaidQuest(Difficulty difficulty) const
@@ -251,7 +251,7 @@ bool Quest::IsAllowedInRaid(Difficulty difficulty) const
     if (IsRaidQuest(difficulty))
         return true;
 
-    return sWorld->getBoolConfig(CONFIG_QUEST_IGNORE_RAID);
+    return sGameConfig->GetBoolConfig("Quests.IgnoreRaid");
 }
 
 uint32 Quest::CalculateHonorGain(uint8 level) const

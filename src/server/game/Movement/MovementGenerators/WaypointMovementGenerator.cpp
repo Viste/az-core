@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -7,7 +7,6 @@
 #include "WaypointMovementGenerator.h"
 //Extended headers
 #include "ObjectMgr.h"
-#include "World.h"
 #include "Transport.h"
 //Flightmaster grid preloading
 #include "MapManager.h"
@@ -20,6 +19,8 @@
 #include "MoveSplineInit.h"
 #include "MoveSpline.h"
 #include "Spell.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 void WaypointMovementGenerator<Creature>::LoadPath(Creature* creature)
 {
@@ -69,7 +70,7 @@ void WaypointMovementGenerator<Creature>::OnArrived(Creature* creature)
     if (i_path->at(i_currentNode)->event_id && urand(0, 99) < i_path->at(i_currentNode)->event_chance)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_MAPSCRIPTS, "Creature movement start script %u at point %u for " UI64FMTD ".", i_path->at(i_currentNode)->event_id, i_currentNode, creature->GetGUID());
+        LOG_DEBUG("maps.script", "Creature movement start script %u at point %u for " UI64FMTD ".", i_path->at(i_currentNode)->event_id, i_currentNode, creature->GetGUID());
 #endif
         creature->ClearUnitState(UNIT_STATE_ROAMING_MOVE);
         creature->GetMap()->ScriptsStart(sWaypointScripts, i_path->at(i_currentNode)->event_id, creature, NULL);
@@ -219,8 +220,10 @@ bool WaypointMovementGenerator<Creature>::DoUpdate(Creature* creature, uint32 di
         if (stop)
         {
             Stop(1000);
+
             if (!creature->IsStopped())
                 creature->StopMoving();
+
             return true;
         }
     }
@@ -233,7 +236,7 @@ bool WaypointMovementGenerator<Creature>::DoUpdate(Creature* creature, uint32 di
     else
     {
         if (creature->IsStopped())
-            Stop(STOP_TIME_FOR_PLAYER);
+            Stop(sGameConfig->GetIntConfig("WaypointMovementStopTimeForPlayer") * IN_MILLISECONDS);
         else
         {
             // xinef: code to detect pre-empetively if we should start movement to next waypoint
@@ -249,7 +252,8 @@ bool WaypointMovementGenerator<Creature>::DoUpdate(Creature* creature, uint32 di
             }
         }
     }
-     return true;
+
+    return true;
  }
 
 void WaypointMovementGenerator<Creature>::MovementInform(Creature* creature)
@@ -317,7 +321,7 @@ void FlightPathMovementGenerator::DoFinalize(Player* player)
         // this prevent cheating with landing  point at lags
         // when client side flight end early in comparison server side
         player->StopMoving();
-        player->SetFallInformation(time(NULL), player->GetPositionZ());
+        player->SetFallInformation(GameTime::GetGameTime(), player->GetPositionZ());
     }
 
     player->RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_TAXI_BENCHMARK);
@@ -409,7 +413,7 @@ bool FlightPathMovementGenerator::DoUpdate(Player* player, uint32 /*diff*/)
             if (i_currentNode >= i_path.size() - 1)
             {
                 player->CleanupAfterTaxiFlight();
-                player->SetFallInformation(time(NULL), player->GetPositionZ());
+                player->SetFallInformation(GameTime::GetGameTime(), player->GetPositionZ());
                 if (player->pvpInfo.IsHostile)
                     player->CastSpell(player, 2479, true);
 
@@ -443,7 +447,7 @@ void FlightPathMovementGenerator::DoEventIfAny(Player* player, TaxiPathNodeEntry
     if (uint32 eventid = departure ? node->departureEventID : node->arrivalEventID)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_MAPSCRIPTS, "Taxi %s event %u of node %u of path %u for player %s", departure ? "departure" : "arrival", eventid, node->index, node->path, player->GetName().c_str());
+        LOG_DEBUG("maps.script", "Taxi %s event %u of node %u of path %u for player %s", departure ? "departure" : "arrival", eventid, node->index, node->path, player->GetName().c_str());
 #endif
         player->GetMap()->ScriptsStart(sEventScripts, eventid, player, player);
     }

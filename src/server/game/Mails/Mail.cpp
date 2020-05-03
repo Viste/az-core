@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,6 +16,8 @@
 #include "AuctionHouseMgr.h"
 #include "CalendarMgr.h"
 #include "ScriptMgr.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 MailSender::MailSender(Object* sender, MailStationery stationery) : m_stationery(stationery)
 {
@@ -184,14 +186,14 @@ void MailDraft::SendMailTo(SQLTransaction& trans, MailReceiver const& receiver, 
 
     uint32 mailId = sObjectMgr->GenerateMailID();
 
-    time_t deliver_time = time(NULL) + deliver_delay;
+    time_t deliver_time = GameTime::GetGameTime() + deliver_delay;
 
     //expire time if COD 3 days, if no COD 30 days, if auction sale pending 1 hour
     uint32 expire_delay;
 
     // auction mail without any items and money
     if (sender.GetMailMessageType() == MAIL_AUCTION && m_items.empty() && !m_money)
-        expire_delay = sWorld->getIntConfig(CONFIG_MAIL_DELIVERY_DELAY);
+        expire_delay = sGameConfig->GetIntConfig("MailDeliveryDelay");
     // mail from battlemaster (rewardmarks) should last only one day
     else if (sender.GetMailMessageType() == MAIL_CREATURE && sBattlegroundMgr->GetBattleMasterBG(sender.GetSenderId()) != BATTLEGROUND_TYPE_NONE)
         expire_delay = DAY;

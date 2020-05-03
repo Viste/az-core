@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -13,6 +13,7 @@
 #include "Opcodes.h"
 #include "GossipDef.h"
 #include "World.h"
+#include "GameTime.h"
 
 Corpse::Corpse(CorpseType type) : WorldObject(type != CORPSE_BONES), m_type(type)
 {
@@ -23,7 +24,7 @@ Corpse::Corpse(CorpseType type) : WorldObject(type != CORPSE_BONES), m_type(type
 
     m_valuesCount = CORPSE_END;
 
-    m_time = time(NULL);
+    m_time = GameTime::GetGameTime();
 
     lootRecipient = NULL;
 }
@@ -183,4 +184,9 @@ bool Corpse::IsExpired(time_t t) const
         return m_time < t - 60 * MINUTE;
     else
         return m_time < t - 3 * DAY;
+}
+
+void Corpse::ResetGhostTime()
+{
+    m_time = GameTime::GetGameTime();
 }

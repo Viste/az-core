@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,6 +16,8 @@
 #include "TemporarySummon.h"
 #include "Vehicle.h"
 #include "WorldSession.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 BattlefieldWG::~BattlefieldWG()
 {
@@ -36,13 +38,13 @@ bool BattlefieldWG::SetupBattlefield()
     // init stalker AFTER setting map id... we spawn it at map=random memory value?...
     InitStalker(BATTLEFIELD_WG_NPC_STALKER, WintergraspStalkerPos[0], WintergraspStalkerPos[1], WintergraspStalkerPos[2], WintergraspStalkerPos[3]);
 
-    m_MaxPlayer = sWorld->getIntConfig(CONFIG_WINTERGRASP_PLR_MAX);
-    m_IsEnabled = sWorld->getBoolConfig(CONFIG_WINTERGRASP_ENABLE);
-    m_MinPlayer = sWorld->getIntConfig(CONFIG_WINTERGRASP_PLR_MIN);
-    m_MinLevel = sWorld->getIntConfig(CONFIG_WINTERGRASP_PLR_MIN_LVL);
-    m_BattleTime = sWorld->getIntConfig(CONFIG_WINTERGRASP_BATTLETIME) * MINUTE * IN_MILLISECONDS;
-    m_NoWarBattleTime = sWorld->getIntConfig(CONFIG_WINTERGRASP_NOBATTLETIME) * MINUTE * IN_MILLISECONDS;
-    m_RestartAfterCrash = sWorld->getIntConfig(CONFIG_WINTERGRASP_RESTART_AFTER_CRASH) * MINUTE * IN_MILLISECONDS;
+    m_MaxPlayer = sGameConfig->GetIntConfig("Wintergrasp.PlayerMax");
+    m_IsEnabled = sGameConfig->GetBoolConfig("Wintergrasp.Enable");
+    m_MinPlayer = sGameConfig->GetIntConfig("Wintergrasp.PlayerMin");
+    m_MinLevel = sGameConfig->GetIntConfig("Wintergrasp.PlayerMinLvl");
+    m_BattleTime = sGameConfig->GetIntConfig("Wintergrasp.BattleTimer") * MINUTE * IN_MILLISECONDS;
+    m_NoWarBattleTime = sGameConfig->GetIntConfig("Wintergrasp.NoBattleTimer") * MINUTE * IN_MILLISECONDS;
+    m_RestartAfterCrash = sGameConfig->GetIntConfig("Wintergrasp.CrashRestartTimer") * MINUTE * IN_MILLISECONDS;
 
     m_TimeForAcceptInvite = 20;
     m_StartGroupingTimer = 15 * MINUTE * IN_MILLISECONDS;
@@ -278,7 +280,7 @@ void BattlefieldWG::OnBattleStart()
     m_tenacityStack = 0;
     m_tenacityUpdateTimer = 20000;
 
-    if (sWorld->getBoolConfig(CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_ENABLE))
+    if (sGameConfig->GetBoolConfig("Battleground.QueueAnnouncer.Enable"))
         sWorld->SendWorldText(BATTLEFIELD_WG_WORLD_START_MESSAGE);
 }
 
@@ -888,7 +890,7 @@ void BattlefieldWG::FillInitialWorldStates(WorldPacket& data)
     data << uint32(BATTLEFIELD_WG_WORLD_STATE_SHOW_WORLDSTATE) << uint32(IsWarTime() ? 1 : 0);
 
     for (uint32 i = 0; i < 2; ++i)
-        data << ClockWorldState[i] << uint32(time(NULL) + (m_Timer / 1000));
+        data << ClockWorldState[i] << uint32(GameTime::GetGameTime() + (m_Timer / 1000));
 
     data << uint32(BATTLEFIELD_WG_WORLD_STATE_VEHICLE_H) << uint32(GetData(BATTLEFIELD_WG_DATA_VEHICLE_H));
     data << uint32(BATTLEFIELD_WG_WORLD_STATE_MAX_VEHICLE_H) << GetData(BATTLEFIELD_WG_DATA_MAX_VEHICLE_H);

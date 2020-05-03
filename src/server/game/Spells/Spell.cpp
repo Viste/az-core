@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -52,6 +52,7 @@
 #include "BattlegroundIC.h"
 #include "GameObjectAI.h"
 #include "ArenaSpectator.h"
+#include "GameConfig.h"
 
 extern pEffect SpellEffects[TOTAL_SPELL_EFFECTS];
 
@@ -981,7 +982,7 @@ void Spell::SelectEffectImplicitTargets(SpellEffIndex effIndex, SpellImplicitTar
             break;
         case TARGET_SELECT_CATEGORY_NYI:
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "SPELL: target type %u, found in spellID %u, effect %u is not implemented yet!", m_spellInfo->Id, effIndex, targetType.GetTarget());
+            LOG_DEBUG("spells.aura", "SPELL: target type %u, found in spellID %u, effect %u is not implemented yet!", m_spellInfo->Id, effIndex, targetType.GetTarget());
 #endif
             break;
         default:
@@ -1014,7 +1015,7 @@ void Spell::SelectImplicitChannelTargets(SpellEffIndex effIndex, SpellImplicitTa
             else
             {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "SPELL: cannot find channel spell target for spell ID %u, effect %u", m_spellInfo->Id, effIndex);
+                LOG_DEBUG("spells.aura", "SPELL: cannot find channel spell target for spell ID %u, effect %u", m_spellInfo->Id, effIndex);
 #endif
             }
             break;
@@ -1036,7 +1037,7 @@ void Spell::SelectImplicitChannelTargets(SpellEffIndex effIndex, SpellImplicitTa
             else //if (!m_targets.HasDst())
             {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "SPELL: cannot find channel spell destination for spell ID %u, effect %u", m_spellInfo->Id, effIndex);
+                LOG_DEBUG("spells.aura", "SPELL: cannot find channel spell destination for spell ID %u, effect %u", m_spellInfo->Id, effIndex);
 #endif
             }
             break;
@@ -1085,7 +1086,7 @@ void Spell::SelectImplicitNearbyTargets(SpellEffIndex effIndex, SpellImplicitTar
     if (targetType.GetCheckType() == TARGET_CHECK_ENTRY && (!condList || condList->empty()))
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell::SelectImplicitNearbyTargets: no conditions entry for target with TARGET_CHECK_ENTRY of spell ID %u, effect %u - selecting default targets", m_spellInfo->Id, effIndex);
+        LOG_DEBUG("spells.aura", "Spell::SelectImplicitNearbyTargets: no conditions entry for target with TARGET_CHECK_ENTRY of spell ID %u, effect %u - selecting default targets", m_spellInfo->Id, effIndex);
 #endif
         switch (targetType.GetObjectType())
         {
@@ -1114,7 +1115,7 @@ void Spell::SelectImplicitNearbyTargets(SpellEffIndex effIndex, SpellImplicitTar
     if (!target)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell::SelectImplicitNearbyTargets: cannot find nearby target for spell ID %u, effect %u", m_spellInfo->Id, effIndex);
+        LOG_DEBUG("spells.aura", "Spell::SelectImplicitNearbyTargets: cannot find nearby target for spell ID %u, effect %u", m_spellInfo->Id, effIndex);
 #endif
         return;
     }
@@ -1319,7 +1320,7 @@ void Spell::SelectImplicitCasterDestTargets(SpellEffIndex effIndex, SpellImplici
             else
             {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "SPELL: unknown target coordinates for spell ID %u", m_spellInfo->Id);
+                LOG_DEBUG("spells.aura", "SPELL: unknown target coordinates for spell ID %u", m_spellInfo->Id);
 #endif
                 if (WorldObject* target = m_targets.GetObjectTarget())
                     dest = SpellDestination(*target);
@@ -2586,7 +2587,7 @@ void Spell::DoAllEffectOnTarget(TargetInfo* target)
 
     // Xinef: absorb delayed projectiles for 500ms
     if (getState() == SPELL_STATE_DELAYED && !m_spellInfo->IsTargetingArea() && !m_spellInfo->IsPositive() && 
-        (World::GetGameTimeMS() - target->timeDelay) <= effectUnit->m_lastSanctuaryTime && World::GetGameTimeMS() < (effectUnit->m_lastSanctuaryTime + 500) &&
+        (GameTime::GetGameTimeMS() - target->timeDelay) <= effectUnit->m_lastSanctuaryTime && GameTime::GetGameTimeMS() < (effectUnit->m_lastSanctuaryTime + 500) &&
         effectUnit->FindMap() && !effectUnit->FindMap()->IsDungeon()
         )
         return;                                             // No missinfo in that case
@@ -3170,7 +3171,7 @@ void Spell::DoTriggersOnSpellHit(Unit* unit, uint8 effMask)
             {
                 m_caster->CastSpell(unit, i->triggeredSpell, true);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell %d triggered spell %d by SPELL_AURA_ADD_TARGET_TRIGGER aura", m_spellInfo->Id, i->triggeredSpell->Id);
+                LOG_DEBUG("spells.aura", "Spell %d triggered spell %d by SPELL_AURA_ADD_TARGET_TRIGGER aura", m_spellInfo->Id, i->triggeredSpell->Id);
 #endif
 
                 // SPELL_AURA_ADD_TARGET_TRIGGER auras shouldn't trigger auras without duration
@@ -3505,7 +3506,7 @@ void Spell::prepare(SpellCastTargets const* targets, AuraEffect const* triggered
     ReSetTimer();
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell::prepare: spell id %u source %u caster %d customCastFlags %u mask %u", m_spellInfo->Id, m_caster->GetEntry(), m_originalCaster ? m_originalCaster->GetEntry() : -1, _triggeredCastFlags, m_targets.GetTargetMask());
+    LOG_DEBUG("spells.aura", "Spell::prepare: spell id %u source %u caster %d customCastFlags %u mask %u", m_spellInfo->Id, m_caster->GetEntry(), m_originalCaster ? m_originalCaster->GetEntry() : -1, _triggeredCastFlags, m_targets.GetTargetMask());
 #endif
 
     //Containers for channeled spells have to be set
@@ -4106,7 +4107,7 @@ void Spell::update(uint32 difftime)
     if (m_targets.GetUnitTargetGUID() && !m_targets.GetUnitTarget())
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell %u is cancelled due to removal of target.", m_spellInfo->Id);
+        LOG_DEBUG("spells.aura", "Spell %u is cancelled due to removal of target.", m_spellInfo->Id);
 #endif
         cancel();
         return;
@@ -4166,7 +4167,7 @@ void Spell::update(uint32 difftime)
             else if ((m_timer < 0 || m_timer > 300) && !UpdateChanneledTargetList())
             {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Channeled spell %d is removed due to lack of targets", m_spellInfo->Id);
+                LOG_DEBUG("spells.aura", "Channeled spell %d is removed due to lack of targets", m_spellInfo->Id);
 #endif
                 SendChannelUpdate(0);
                 finish();
@@ -4232,7 +4233,7 @@ void Spell::finish(bool ok)
         if (spellInfo && spellInfo->SpellIconID == 2056)
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Statue %d is unsummoned in spell %d finish", m_caster->GetGUIDLow(), m_spellInfo->Id);
+            LOG_DEBUG("spells.aura", "Statue %d is unsummoned in spell %d finish", m_caster->GetGUIDLow(), m_spellInfo->Id);
 #endif
             m_caster->setDeathState(JUST_DIED);
             return;
@@ -4443,7 +4444,7 @@ void Spell::SendSpellStart()
     if (!IsNeedSendToClient(false))
         return;
 
-    //sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Sending SMSG_SPELL_START id=%u", m_spellInfo->Id);
+    //LOG_DEBUG("spells.aura", "Sending SMSG_SPELL_START id=%u", m_spellInfo->Id);
 
     uint32 castFlags = CAST_FLAG_UNKNOWN_2;
 
@@ -4498,7 +4499,7 @@ void Spell::SendSpellGo()
     if (!IsNeedSendToClient(true))
         return;
 
-    //sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Sending SMSG_SPELL_GO id=%u", m_spellInfo->Id);
+    //LOG_DEBUG("spells.aura", "Sending SMSG_SPELL_GO id=%u", m_spellInfo->Id);
 
     uint32 castFlags = CAST_FLAG_UNKNOWN_9;
 
@@ -4543,7 +4544,7 @@ void Spell::SendSpellGo()
     data << uint8(m_cast_count);                            // pending spell cast?
     data << uint32(m_spellInfo->Id);                        // spellId
     data << uint32(castFlags);                              // cast flags
-    data << uint32(World::GetGameTimeMS());                 // timestamp
+    data << uint32(GameTime::GetGameTimeMS());                 // timestamp
 
     WriteSpellGoTargets(&data);
 
@@ -5031,7 +5032,7 @@ void Spell::TakePower()
 
     // Set the five second timer
     if (powerType == POWER_MANA && m_powerCost > 0)
-        m_caster->SetLastManaUse(World::GetGameTimeMS());
+        m_caster->SetLastManaUse(GameTime::GetGameTimeMS());
 }
 
 void Spell::TakeAmmo()
@@ -5177,7 +5178,7 @@ void Spell::TakeRunePower(bool didHit)
 
     // you can gain some runic power when use runes
     if (didHit)
-        if (int32 rp = int32(runeCostData->runePowerGain * sWorld->getRate(RATE_POWER_RUNICPOWER_INCOME)))
+        if (int32 rp = int32(runeCostData->runePowerGain * sGameConfig->GetFloatConfig("Rate.RunicPower.Income")))
             player->ModifyPower(POWER_RUNIC_POWER, int32(rp));
 }
 
@@ -5275,7 +5276,7 @@ void Spell::HandleThreatSpells()
             target->AddThreat(m_caster, threatToAdd, m_spellInfo->GetSchoolMask(), m_spellInfo);
     }
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell %u, added an additional %f threat for %s %u target(s)", m_spellInfo->Id, threat, m_spellInfo->_IsPositiveSpell() ? "assisting" : "harming", uint32(m_UniqueTargetInfo.size()));
+    LOG_DEBUG("spells.aura", "Spell %u, added an additional %f threat for %s %u target(s)", m_spellInfo->Id, threat, m_spellInfo->_IsPositiveSpell() ? "assisting" : "harming", uint32(m_UniqueTargetInfo.size()));
 #endif
 }
 
@@ -5290,7 +5291,7 @@ void Spell::HandleEffects(Unit* pUnitTarget, Item* pItemTarget, GameObject* pGOT
     uint8 eff = m_spellInfo->Effects[i].Effect;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell: %u Effect : %u", m_spellInfo->Id, eff);
+    LOG_DEBUG("spells.aura", "Spell: %u Effect : %u", m_spellInfo->Id, eff);
 #endif
 
     // we do not need DamageMultiplier here.
@@ -5848,7 +5849,7 @@ SpellCastResult Spell::CheckCast(bool strict)
                             return SPELL_FAILED_BAD_TARGETS;
                 // Xinef: Pass only explicit unit target spells
                 // pussywizard:
-                if (MMAP::MMapFactory::IsPathfindingEnabled(m_caster->FindMap()) && m_spellInfo->NeedsExplicitUnitTarget())
+                if (DisableMgr::IsPathfindingEnabled(m_caster->FindMap()) && m_spellInfo->NeedsExplicitUnitTarget())
                 {
                     Unit* target = m_targets.GetUnitTarget();
                     if (!target)
@@ -6053,7 +6054,7 @@ SpellCastResult Spell::CheckCast(bool strict)
                     return SPELL_FAILED_BAD_TARGETS;
 
                 // Xinef: Implement summon pending error
-                if (target->GetSummonExpireTimer() > time(NULL))
+                if (target->GetSummonExpireTimer() > GameTime::GetGameTime())
                     return SPELL_FAILED_SUMMON_PENDING;
 
                 // check if our map is dungeon
@@ -6093,7 +6094,7 @@ SpellCastResult Spell::CheckCast(bool strict)
                     return SPELL_FAILED_BAD_TARGETS;
 
                 // Xinef: Implement summon pending error
-                if (target->GetSummonExpireTimer() > time(NULL))
+                if (target->GetSummonExpireTimer() > GameTime::GetGameTime())
                     return SPELL_FAILED_SUMMON_PENDING;
 
                 break;
@@ -6633,12 +6634,8 @@ SpellCastResult Spell::CheckRange(bool strict)
             // Xinef: WHAT DA FUCK IS THIS SHIT? Spells with 5yd range can hit target 9yd away? >.>
             if (range_type == SPELL_RANGE_MELEE)
             {
-                float real_max_range = max_range;
-                if (m_caster->GetTypeId() != TYPEID_UNIT && m_caster->isMoving() && target->isMoving() && !m_caster->IsWalking() && !target->IsWalking())
-                    real_max_range -= MIN_MELEE_REACH; // Because of lag, we can not check too strictly here (is only used if both caster and target are moving)
-                else
-                    real_max_range -= 2*MIN_MELEE_REACH;
-
+                // Because of lag, we can not check too strictly here.
+                float real_max_range = m_caster->GetTypeId() == TYPEID_UNIT ? max_range - 2*MIN_MELEE_REACH : max_range - MIN_MELEE_REACH;
                 if (!m_caster->IsWithinMeleeRange(target, std::max(real_max_range, 0.0f)))
                     return SPELL_FAILED_OUT_OF_RANGE;
             }
@@ -7336,7 +7333,7 @@ void Spell::DelayedChannel()
         m_timer -= delaytime;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell %u partially interrupted for %i ms, new duration: %u ms", m_spellInfo->Id, delaytime, m_timer);
+    LOG_DEBUG("spells.aura", "Spell %u partially interrupted for %i ms, new duration: %u ms", m_spellInfo->Id, delaytime, m_timer);
 #endif
 
     for (std::list<TargetInfo>::const_iterator ihit = m_UniqueTargetInfo.begin(); ihit != m_UniqueTargetInfo.end(); ++ihit)
@@ -7506,7 +7503,7 @@ bool Spell::CheckEffectTarget(Unit const* target, uint32 eff) const
             }
             break;
         /*case SPELL_EFFECT_CHARGE:
-            if (MMAP::MMapFactory::IsPathfindingEnabled(m_caster->FindMap()))
+            if (DisableMgr::IsPathfindingEnabled(m_caster->FindMap()))
                 break;*/
             // else no break intended
 
@@ -7517,7 +7514,7 @@ bool Spell::CheckEffectTarget(Unit const* target, uint32 eff) const
                 return false;
             if (m_caster->ToPlayer()->GetSession()->GetRecruiterId() != target->ToPlayer()->GetSession()->GetAccountId() && target->ToPlayer()->GetSession()->IsARecruiter())
                 return false;
-            if (target->ToPlayer()->getLevel() >= sWorld->getIntConfig(CONFIG_MAX_RECRUIT_A_FRIEND_BONUS_PLAYER_LEVEL))
+            if (target->ToPlayer()->getLevel() >= sGameConfig->GetIntConfig("RecruitAFriend.MaxLevel"))
                 return false;
             break;
 
@@ -7995,7 +7992,7 @@ void Spell::LoadScripts()
             continue;
         }
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Spell::LoadScripts: Script `%s` for spell `%u` is loaded now", (*itr)->_GetScriptName()->c_str(), m_spellInfo->Id);
+        LOG_DEBUG("spells.aura", "Spell::LoadScripts: Script `%s` for spell `%u` is loaded now", (*itr)->_GetScriptName()->c_str(), m_spellInfo->Id);
 #endif
         (*itr)->Register();
         ++itr;
@@ -8536,7 +8533,7 @@ bool WorldObjectSpellConeTargetCheck::operator()(WorldObject* target)
     }
     else if (_spellInfo->HasAttribute(SPELL_ATTR0_CU_CONE_LINE))
     {
-        if (!_caster->HasInLine(target, _caster->GetObjectSize()))
+        if (!_caster->HasInLine(target, _caster->GetObjectSize() + target->GetObjectSize()))
             return false;
     }
     else
@@ -8556,7 +8553,7 @@ WorldObjectSpellTrajTargetCheck::WorldObjectSpellTrajTargetCheck(float range, Po
 bool WorldObjectSpellTrajTargetCheck::operator()(WorldObject* target)
 {
     // return all targets on missile trajectory (0 - size of a missile)
-    if (!_caster->HasInLine(target, 0))
+    if (!_caster->HasInLine(target, target->GetObjectSize()))
         return false;
     return WorldObjectSpellAreaTargetCheck::operator ()(target);
 }

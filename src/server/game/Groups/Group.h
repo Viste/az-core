@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -299,13 +299,9 @@ class Group
         bool IsLfgHeroic() const { return isLFGGroup() && (m_lfgGroupFlags & GROUP_LFG_FLAG_IS_HEROIC); }
 
         // Difficulty Change
-        uint32 GetDifficultyChangePreventionTime() const { return _difficultyChangePreventionTime > time(NULL) ? _difficultyChangePreventionTime - time(NULL) : 0; }
+        uint32 GetDifficultyChangePreventionTime() const;
         DifficultyPreventionChangeType GetDifficultyChangePreventionReason() const { return _difficultyChangePreventionType; }
-        void SetDifficultyChangePrevention(DifficultyPreventionChangeType type)
-        {
-            _difficultyChangePreventionTime = time(NULL) + MINUTE;
-            _difficultyChangePreventionType = type;
-        }
+        void SetDifficultyChangePrevention(DifficultyPreventionChangeType type);
 
     protected:
         void _homebindIfInstance(Player* player);

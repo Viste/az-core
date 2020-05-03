@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -15,6 +15,8 @@ EndScriptData */
 #include "Config.h"
 #include "Language.h"
 #include "ObjectAccessor.h"
+#include "GameTime.h"
+#include "UpdateTime.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "GitRevision.h"
@@ -55,8 +57,6 @@ public:
         static std::vector<ChatCommand> serverSetCommandTable =
         {
             { "difftime",       SEC_CONSOLE,        true,  &HandleServerSetDiffTimeCommand,         "" },
-            { "loglevel",       SEC_CONSOLE,        true,  &HandleServerSetLogLevelCommand,         "" },
-            { "logfilelevel",   SEC_CONSOLE,        true,  &HandleServerSetLogFileLevelCommand,     "" },
             { "motd",           SEC_ADMINISTRATOR,  true,  &HandleServerSetMotdCommand,             "" },
             { "closed",         SEC_ADMINISTRATOR,  true,  &HandleServerSetClosedCommand,           "" }
         };
@@ -71,8 +71,7 @@ public:
             { "motd",           SEC_PLAYER,         true,  &HandleServerMotdCommand,                "" },
             { "restart",        SEC_ADMINISTRATOR,  true,  nullptr,                                 "", serverRestartCommandTable },
             { "shutdown",       SEC_ADMINISTRATOR,  true,  nullptr,                                 "", serverShutdownCommandTable },
-            { "set",            SEC_ADMINISTRATOR,  true,  nullptr,                                 "", serverSetCommandTable },
-            { "togglequerylog", SEC_CONSOLE,        true,  &HandleServerToggleQueryLogging,         "" }
+            { "set",            SEC_ADMINISTRATOR,  true,  nullptr,                                 "", serverSetCommandTable }
         };
 
          static std::vector<ChatCommand> commandTable =
@@ -96,8 +95,8 @@ public:
         uint32 activeSessionCount = sWorld->GetActiveSessionCount();
         uint32 queuedSessionCount = sWorld->GetQueuedSessionCount();
         uint32 connPeak = sWorld->GetMaxActiveSessionCount();
-        std::string uptime = secsToTimeString(sWorld->GetUptime()).append(".");
-        uint32 updateTime = sWorld->GetUpdateTime();
+        std::string uptime = secsToTimeString(GameTime::GetUptime());
+        uint32 updateTime = sWorldUpdateTime.GetLastUpdateTime();
         uint32 avgUpdateTime = avgDiffTracker.getAverage();
 
         handler->PSendSysMessage("%s", GitRevision::GetFullVersion());
@@ -312,35 +311,7 @@ public:
         handler->SetSentErrorMessage(true);
         return false;
     }
-
-    // Set the level of logging
-    static bool HandleServerSetLogFileLevelCommand(ChatHandler* /*handler*/, char const* args)
-    {
-        if (!*args)
-            return false;
-
-        char* newLevel = strtok((char*)args, " ");
-        if (!newLevel)
-            return false;
-
-        sLog->SetLogFileLevel(newLevel);
-        return true;
-    }
-
-    // Set the level of logging
-    static bool HandleServerSetLogLevelCommand(ChatHandler* /*handler*/, char const* args)
-    {
-        if (!*args)
-            return false;
-
-        char* newLevel = strtok((char*)args, " ");
-        if (!newLevel)
-            return false;
-
-        sLog->SetLogLevel(newLevel);
-        return true;
-    }
-
+       
     // set diff time record interval
     static bool HandleServerSetDiffTimeCommand(ChatHandler* /*handler*/, char const* args)
     {
@@ -355,21 +326,9 @@ public:
         if (newTime < 0)
             return false;
 
-        sWorld->SetRecordDiffInterval(newTime);
+        sWorldUpdateTime.SetRecordUpdateTimeInterval(newTime);
         printf("Record diff every %u ms\n", newTime);
 
-        return true;
-    }
-
-    // toggle sql driver query logging
-    static bool HandleServerToggleQueryLogging(ChatHandler* handler, char const* /*args*/)
-    {
-        sLog->SetSQLDriverQueryLogging(!sLog->GetSQLDriverQueryLogging());
-
-        if (sLog->GetSQLDriverQueryLogging())
-            handler->PSendSysMessage(LANG_SQLDRIVER_QUERY_LOGGING_ENABLED);
-        else
-            handler->PSendSysMessage(LANG_SQLDRIVER_QUERY_LOGGING_DISABLED);
         return true;
     }
 };

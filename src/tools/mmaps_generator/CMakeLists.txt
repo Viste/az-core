@@ -15,6 +15,8 @@ CollectSourceFiles(
 add_executable(mmaps_generator ${PRIVATE_SOURCES})
 
 target_link_libraries(mmaps_generator
+  PRIVATE
+    acore-core-interface
   PUBLIC
     common
     Recast
@@ -31,8 +33,7 @@ target_include_directories(mmaps_generator
   PUBLIC
     ${PUBLIC_INCLUDES}
   PRIVATE
-    ${CMAKE_CURRENT_BINARY_DIR}
-    ${CMAKE_SOURCE_DIR}/src/server/game/Conditions)
+    ${CMAKE_CURRENT_BINARY_DIR})
 
 set_target_properties(mmaps_generator
   PROPERTIES

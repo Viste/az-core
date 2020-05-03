@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -15,6 +15,7 @@
 #include "SpellAuras.h"
 #include "SpellMgr.h"
 #include "SpellInfo.h"
+#include "GameTime.h"
 
 //==============================================================
 //================= ThreatCalcHelper ===========================
@@ -296,7 +297,7 @@ HostileReference* ThreatContainer::selectNextVictim(Creature* attacker, HostileR
     HostileReference* currentRef = NULL;
     bool found = false;
     bool noPriorityTargetFound = false;
-    uint32 currTime = sWorld->GetGameTime();
+    uint32 currTime = GameTime::GetGameTime();
 
     // pussywizard: currentVictim is needed to compare if threat was exceeded by 10%/30% for melee/range targets (only then switching current target)
     if (currentVictim)

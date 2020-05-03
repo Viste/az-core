@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU AGPL3 v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  */
 
 #include "BanManager.h"
@@ -12,6 +12,8 @@
 #include "ScriptMgr.h"
 #include "World.h"
 #include "WorldSession.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 BanManager* BanManager::instance()
 {
@@ -39,7 +41,7 @@ BanReturn BanManager::BanAccount(std::string const& AccountName, std::string con
     stmtAccountBanned->setUInt32(0, AccountID);
 
     PreparedQueryResult banresult = LoginDatabase.Query(stmtAccountBanned);
-    if (banresult && ((*banresult)[0].GetUInt32() == (*banresult)[1].GetUInt32() || ((*banresult)[1].GetUInt32() > time(nullptr) + DurationSecs && DurationSecs)))
+    if (banresult && ((*banresult)[0].GetUInt32() == (*banresult)[1].GetUInt32() || ((*banresult)[1].GetUInt32() > GameTime::GetGameTime() + DurationSecs && DurationSecs)))
         return BAN_LONGER_EXISTS;
 
     // make sure there is only one active ban
@@ -65,7 +67,7 @@ BanReturn BanManager::BanAccount(std::string const& AccountName, std::string con
 
     LoginDatabase.CommitTransaction(trans);
 
-    if (sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD))
+    if (sGameConfig->GetBoolConfig("ShowBanInWorld"))
     {
         bool IsPermanetly = true;
 
@@ -101,7 +103,7 @@ BanReturn BanManager::BanAccountByPlayerName(std::string const& CharacterName, s
     stmtAccountBanned->setUInt32(0, AccountID);
 
     PreparedQueryResult banresult = LoginDatabase.Query(stmtAccountBanned);
-    if (banresult && ((*banresult)[0].GetUInt32() == (*banresult)[1].GetUInt32() || ((*banresult)[1].GetUInt32() > time(nullptr) + DurationSecs && DurationSecs)))
+    if (banresult && ((*banresult)[0].GetUInt32() == (*banresult)[1].GetUInt32() || ((*banresult)[1].GetUInt32() > GameTime::GetGameTime() + DurationSecs && DurationSecs)))
         return BAN_LONGER_EXISTS;
 
     // make sure there is only one active ban
@@ -127,7 +129,7 @@ BanReturn BanManager::BanAccountByPlayerName(std::string const& CharacterName, s
 
     LoginDatabase.CommitTransaction(trans);
 
-    if (sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD))
+    if (sGameConfig->GetBoolConfig("ShowBanInWorld"))
     {
         bool IsPermanetly = true;
 
@@ -167,7 +169,7 @@ BanReturn BanManager::BanIP(std::string const& IP, std::string const& Duration, 
     stmt->setString(3, Reason);
     LoginDatabase.Execute(stmt);
 
-    if (sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD))
+    if (sGameConfig->GetBoolConfig("ShowBanInWorld"))
     {
         bool IsPermanetly = true;
 
@@ -238,7 +240,7 @@ BanReturn BanManager::BanCharacter(std::string const& CharacterName, std::string
     if (target)
         target->GetSession()->KickPlayer("Ban");
 
-    if (sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD))
+    if (sGameConfig->GetBoolConfig("ShowBanInWorld"))
     {
         bool IsPermanetly = true;
 

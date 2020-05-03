@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -274,8 +274,8 @@ WorldSocketMgr::StartReactiveIO (uint16 port, const char* address)
 int
 WorldSocketMgr::StartNetwork (uint16 port, const char* address)
 {
-    if (!sLog->IsOutDebug())
-        ACE_Log_Msg::instance()->priority_mask (LM_ERROR, ACE_Log_Msg::PROCESS);
+    if (!sLog->ShouldLog("network", LOG_LEVEL_DEBUG))
+        ACE_Log_Msg::instance()->priority_mask(LM_ERROR, ACE_Log_Msg::PROCESS);
 
     if (StartReactiveIO(port, address) == -1)
         return -1;

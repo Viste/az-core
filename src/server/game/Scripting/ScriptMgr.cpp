@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -10,70 +10,40 @@
 #include "DBCStores.h"
 #include "ObjectMgr.h"
 #include "OutdoorPvPMgr.h"
-#include "ScriptLoader.h"
 #include "ScriptSystem.h"
 #include "Transport.h"
 #include "Vehicle.h"
+#include "SmartAI.h"
 #include "SpellInfo.h"
 #include "SpellScript.h"
 #include "GossipDef.h"
 #include "ScriptedGossip.h"
-#include "CreatureAI.h"
+#include "CreatureAIImpl.h"
 #include "Player.h"
 #include "WorldPacket.h"
 #include "Chat.h"
+#include "ScriptMgrMacros.h"
 
 #ifdef ELUNA
 #include "LuaEngine.h"
 #include "ElunaUtility.h"
 #endif
 
-// Specialize for each script type class like so:
-template class ScriptRegistry<SpellScriptLoader>;
-template class ScriptRegistry<ServerScript>;
-template class ScriptRegistry<WorldScript>;
-template class ScriptRegistry<FormulaScript>;
-template class ScriptRegistry<WorldMapScript>;
-template class ScriptRegistry<InstanceMapScript>;
-template class ScriptRegistry<BattlegroundMapScript>;
-template class ScriptRegistry<ItemScript>;
-template class ScriptRegistry<CreatureScript>;
-template class ScriptRegistry<GameObjectScript>;
-template class ScriptRegistry<AreaTriggerScript>;
-template class ScriptRegistry<BattlegroundScript>;
-template class ScriptRegistry<OutdoorPvPScript>;
-template class ScriptRegistry<CommandScript>;
-template class ScriptRegistry<WeatherScript>;
-template class ScriptRegistry<AuctionHouseScript>;
-template class ScriptRegistry<ConditionScript>;
-template class ScriptRegistry<VehicleScript>;
-template class ScriptRegistry<DynamicObjectScript>;
-template class ScriptRegistry<TransportScript>;
-template class ScriptRegistry<AchievementCriteriaScript>;
-template class ScriptRegistry<PlayerScript>;
-template class ScriptRegistry<GuildScript>;
-template class ScriptRegistry<GroupScript>;
-template class ScriptRegistry<GlobalScript>;
-template class ScriptRegistry<UnitScript>;
-template class ScriptRegistry<AllCreatureScript>;
-template class ScriptRegistry<AllMapScript>;
-template class ScriptRegistry<MovementHandlerScript>;
-template class ScriptRegistry<BGScript>;
-template class ScriptRegistry<SpellSC>;
-template class ScriptRegistry<AccountScript>;
-template class ScriptRegistry<GameEventScript>;
-template class ScriptRegistry<MailScript>;
-
-#include "ScriptMgrMacros.h"
+struct TSpellSummary
+{
+    uint8 Targets;  // set of enum SelectTarget
+    uint8 Effects;  // set of enum SelectEffect
+} *SpellSummary;
 
 ScriptMgr::ScriptMgr()
-    : _scriptCount(0), _scheduledScripts(0)
+    : _scriptCount(0), _script_loader_callback(nullptr)
 {
 
 }
 
 ScriptMgr::~ScriptMgr()
 {
+
 }
 
 ScriptMgr* ScriptMgr::instance()
@@ -84,8 +54,15 @@ ScriptMgr* ScriptMgr::instance()
 
 void ScriptMgr::Initialize()
 {
-    AddScripts();
-    sLog->outString("Loading C++ scripts");
+    LOG_INFO("server.loading", "> Loading C++ scripts");
+    LOG_INFO("server.loading", "");
+
+    AddSC_SmartScripts();
+    
+    ASSERT(_script_loader_callback,
+           "Script loader callback wasn't registered!");
+
+    _script_loader_callback();
 }
 
 void ScriptMgr::Unload()
@@ -129,6 +106,9 @@ void ScriptMgr::Unload()
     SCR_CLEAR(MailScript);
 
     #undef SCR_CLEAR
+
+    delete[] SpellSummary;
+    delete[] UnitAI::AISpellInfo;
 }
 
 void ScriptMgr::LoadDatabase()
@@ -159,52 +139,53 @@ void ScriptMgr::LoadDatabase()
 
     sLog->outString(">> Loaded %u C++ scripts in %u ms", GetScriptCount(), GetMSTimeDiffToNow(oldMSTime));
     sLog->outString();
-}
 
-struct TSpellSummary
-{
-    uint8 Targets;                                          // set of enum SelectTarget
-    uint8 Effects;                                          // set of enum SelectEffect
-} *SpellSummary;
+    ASSERT(_script_loader_callback,
+           "Script loader callback wasn't registered!");
+}
 
 void ScriptMgr::CheckIfScriptsInDatabaseExist()
 {
-    ObjectMgr::ScriptNameContainer& sn = sObjectMgr->GetScriptNames();
-    for (ObjectMgr::ScriptNameContainer::iterator itr = sn.begin(); itr != sn.end(); ++itr)
-        if (uint32 sid = sObjectMgr->GetScriptId((*itr).c_str()))
-        {
-            if (!ScriptRegistry<SpellScriptLoader>::GetScriptById(sid) &&
-                !ScriptRegistry<ServerScript>::GetScriptById(sid) &&
-                !ScriptRegistry<WorldScript>::GetScriptById(sid) &&
-                !ScriptRegistry<FormulaScript>::GetScriptById(sid) &&
-                !ScriptRegistry<WorldMapScript>::GetScriptById(sid) &&
-                !ScriptRegistry<InstanceMapScript>::GetScriptById(sid) &&
-                !ScriptRegistry<BattlegroundMapScript>::GetScriptById(sid) &&
-                !ScriptRegistry<ItemScript>::GetScriptById(sid) &&
-                !ScriptRegistry<CreatureScript>::GetScriptById(sid) &&
-                !ScriptRegistry<GameObjectScript>::GetScriptById(sid) &&
-                !ScriptRegistry<AreaTriggerScript>::GetScriptById(sid) &&
-                !ScriptRegistry<BattlegroundScript>::GetScriptById(sid) &&
-                !ScriptRegistry<OutdoorPvPScript>::GetScriptById(sid) &&
-                !ScriptRegistry<CommandScript>::GetScriptById(sid) &&
-                !ScriptRegistry<WeatherScript>::GetScriptById(sid) &&
-                !ScriptRegistry<AuctionHouseScript>::GetScriptById(sid) &&
-                !ScriptRegistry<ConditionScript>::GetScriptById(sid) &&
-                !ScriptRegistry<VehicleScript>::GetScriptById(sid) &&
-                !ScriptRegistry<DynamicObjectScript>::GetScriptById(sid) &&
-                !ScriptRegistry<TransportScript>::GetScriptById(sid) &&
-                !ScriptRegistry<AchievementCriteriaScript>::GetScriptById(sid) &&
-                !ScriptRegistry<PlayerScript>::GetScriptById(sid) &&
-                !ScriptRegistry<GuildScript>::GetScriptById(sid) &&
-                !ScriptRegistry<BGScript>::GetScriptById(sid) &&
-                !ScriptRegistry<SpellSC>::GetScriptById(sid) &&
-                !ScriptRegistry<GroupScript>::GetScriptById(sid))
-                sLog->outErrorDb("Script named '%s' is assigned in the database, but has no code!", (*itr).c_str());
-        }
+    for (auto const& itr : sObjectMgr->GetScriptNames())
+    {
+        uint32 sid = sObjectMgr->GetScriptId(itr.c_str());
+        if (!sid)
+            continue;
+
+        if (!ScriptRegistry<SpellScriptLoader>::GetScriptById(sid) &&
+            !ScriptRegistry<ServerScript>::GetScriptById(sid) &&
+            !ScriptRegistry<WorldScript>::GetScriptById(sid) &&
+            !ScriptRegistry<FormulaScript>::GetScriptById(sid) &&
+            !ScriptRegistry<WorldMapScript>::GetScriptById(sid) &&
+            !ScriptRegistry<InstanceMapScript>::GetScriptById(sid) &&
+            !ScriptRegistry<BattlegroundMapScript>::GetScriptById(sid) &&
+            !ScriptRegistry<ItemScript>::GetScriptById(sid) &&
+            !ScriptRegistry<CreatureScript>::GetScriptById(sid) &&
+            !ScriptRegistry<GameObjectScript>::GetScriptById(sid) &&
+            !ScriptRegistry<AreaTriggerScript>::GetScriptById(sid) &&
+            !ScriptRegistry<BattlegroundScript>::GetScriptById(sid) &&
+            !ScriptRegistry<OutdoorPvPScript>::GetScriptById(sid) &&
+            !ScriptRegistry<CommandScript>::GetScriptById(sid) &&
+            !ScriptRegistry<WeatherScript>::GetScriptById(sid) &&
+            !ScriptRegistry<AuctionHouseScript>::GetScriptById(sid) &&
+            !ScriptRegistry<ConditionScript>::GetScriptById(sid) &&
+            !ScriptRegistry<VehicleScript>::GetScriptById(sid) &&
+            !ScriptRegistry<DynamicObjectScript>::GetScriptById(sid) &&
+            !ScriptRegistry<TransportScript>::GetScriptById(sid) &&
+            !ScriptRegistry<AchievementCriteriaScript>::GetScriptById(sid) &&
+            !ScriptRegistry<PlayerScript>::GetScriptById(sid) &&
+            !ScriptRegistry<GuildScript>::GetScriptById(sid) &&
+            !ScriptRegistry<BGScript>::GetScriptById(sid) &&
+            !ScriptRegistry<SpellSC>::GetScriptById(sid) &&
+            !ScriptRegistry<GroupScript>::GetScriptById(sid))
+            sLog->outErrorDb("Script named '%s' is assigned in database, but has no code!", itr.c_str());
+    }
 }
 
 void ScriptMgr::FillSpellSummary()
 {
+    UnitAI::FillAISpellInfo();
+
     SpellSummary = new TSpellSummary[sSpellMgr->GetSpellInfoStoreSize()];
 
     SpellInfo const* pTempSpell;
@@ -2329,9 +2310,38 @@ GameEventScript::GameEventScript(const char* name)
     ScriptRegistry<GameEventScript>::AddScript(this);
 }
 
-MailScript::MailScript(const char* name)
-    : ScriptObject(name)
-{
-    ScriptRegistry<MailScript>::AddScript(this);
-}
+// Specialize for each script type class like so:
+template class ScriptRegistry<SpellScriptLoader>;
+template class ScriptRegistry<ServerScript>;
+template class ScriptRegistry<WorldScript>;
+template class ScriptRegistry<FormulaScript>;
+template class ScriptRegistry<WorldMapScript>;
+template class ScriptRegistry<InstanceMapScript>;
+template class ScriptRegistry<BattlegroundMapScript>;
+template class ScriptRegistry<ItemScript>;
+template class ScriptRegistry<CreatureScript>;
+template class ScriptRegistry<GameObjectScript>;
+template class ScriptRegistry<AreaTriggerScript>;
+template class ScriptRegistry<BattlegroundScript>;
+template class ScriptRegistry<OutdoorPvPScript>;
+template class ScriptRegistry<CommandScript>;
+template class ScriptRegistry<WeatherScript>;
+template class ScriptRegistry<AuctionHouseScript>;
+template class ScriptRegistry<ConditionScript>;
+template class ScriptRegistry<VehicleScript>;
+template class ScriptRegistry<DynamicObjectScript>;
+template class ScriptRegistry<TransportScript>;
+template class ScriptRegistry<AchievementCriteriaScript>;
+template class ScriptRegistry<PlayerScript>;
+template class ScriptRegistry<GuildScript>;
+template class ScriptRegistry<GroupScript>;
+template class ScriptRegistry<GlobalScript>;
+template class ScriptRegistry<UnitScript>;
+template class ScriptRegistry<AllCreatureScript>;
+template class ScriptRegistry<AllMapScript>;
+template class ScriptRegistry<MovementHandlerScript>;
+template class ScriptRegistry<BGScript>;
+template class ScriptRegistry<SpellSC>;
+template class ScriptRegistry<AccountScript>;
+template class ScriptRegistry<GameEventScript>;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU AGPL3 v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -12,22 +12,22 @@
 
 namespace acore
 {
-    DECLSPEC_NORETURN void Assert(char const* file, int line, char const* function, std::string const& debugInfo, char const* message) ATTR_NORETURN;
-    DECLSPEC_NORETURN void Assert(char const* file, int line, char const* function, std::string const& debugInfo, char const* message, char const* format, ...) ATTR_NORETURN ATTR_PRINTF(6, 7);
+    DECLSPEC_NORETURN AC_COMMON_API void Assert(char const* file, int line, char const* function, std::string const& debugInfo, char const* message) ATTR_NORETURN;
+    DECLSPEC_NORETURN AC_COMMON_API void Assert(char const* file, int line, char const* function, std::string const& debugInfo, char const* message, char const* format, ...) ATTR_NORETURN ATTR_PRINTF(6, 7);
 
-    DECLSPEC_NORETURN void Fatal(char const* file, int line, char const* function, char const* message, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
+    DECLSPEC_NORETURN AC_COMMON_API void Fatal(char const* file, int line, char const* function, char const* message, ...) ATTR_NORETURN ATTR_PRINTF(4, 5);
 
-    DECLSPEC_NORETURN void Error(char const* file, int line, char const* function, char const* message) ATTR_NORETURN;
+    DECLSPEC_NORETURN AC_COMMON_API void Error(char const* file, int line, char const* function, char const* message) ATTR_NORETURN;
 
-    DECLSPEC_NORETURN void Abort(char const* file, int line, char const* function) ATTR_NORETURN;
+    DECLSPEC_NORETURN AC_COMMON_API void Abort(char const* file, int line, char const* function) ATTR_NORETURN;
 
-    void Warning(char const* file, int line, char const* function, char const* message);
+    AC_COMMON_API void Warning(char const* file, int line, char const* function, char const* message);
 
-    DECLSPEC_NORETURN void AbortHandler(int sigval) ATTR_NORETURN;
+    DECLSPEC_NORETURN AC_COMMON_API void AbortHandler(int sigval) ATTR_NORETURN;
 
 } // namespace acore
 
-std::string GetDebugInfo();
+AC_COMMON_API std::string GetDebugInfo();
 
 #if AC_COMPILER == AC_COMPILER_MICROSOFT
 #define ASSERT_BEGIN __pragma(warning(push)) __pragma(warning(disable: 4127))

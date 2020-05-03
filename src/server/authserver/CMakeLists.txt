@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU AGPL3 v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
+# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -42,6 +42,8 @@ if(NOT WIN32)
 endif()
 
 target_link_libraries(authserver
+  PRIVATE
+    acore-core-interface
   PUBLIC
     shared)
 

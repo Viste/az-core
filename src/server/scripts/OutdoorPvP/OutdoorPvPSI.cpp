@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,6 +16,7 @@
 #include "Language.h"
 #include "World.h"
 #include "Transport.h"
+#include "GameLocale.h"
 
 OutdoorPvPSI::OutdoorPvPSI()
 {
@@ -87,7 +88,7 @@ bool OutdoorPvPSI::HandleAreaTrigger(Player* player, uint32 trigger)
             if (m_Gathered_A >= SI_MAX_RESOURCES)
             {
                 TeamApplyBuff(TEAM_ALLIANCE, SI_CENARION_FAVOR, 0, player);
-                sWorld->SendZoneText(OutdoorPvPSIBuffZones[0], sObjectMgr->GetAcoreStringForDBCLocale(LANG_OPVP_SI_CAPTURE_A));
+                sWorld->SendZoneText(OutdoorPvPSIBuffZones[0], sGameLocale->GetAcoreStringForDBCLocale(LANG_OPVP_SI_CAPTURE_A));
                 m_LastController = TEAM_ALLIANCE;
                 m_Gathered_A = 0;
                 m_Gathered_H = 0;
@@ -113,7 +114,7 @@ bool OutdoorPvPSI::HandleAreaTrigger(Player* player, uint32 trigger)
             if (m_Gathered_H >= SI_MAX_RESOURCES)
             {
                 TeamApplyBuff(TEAM_HORDE, SI_CENARION_FAVOR, 0, player);
-                sWorld->SendZoneText(OutdoorPvPSIBuffZones[0], sObjectMgr->GetAcoreStringForDBCLocale(LANG_OPVP_SI_CAPTURE_H));
+                sWorld->SendZoneText(OutdoorPvPSIBuffZones[0], sGameLocale->GetAcoreStringForDBCLocale(LANG_OPVP_SI_CAPTURE_H));
                 m_LastController = TEAM_HORDE;
                 m_Gathered_A = 0;
                 m_Gathered_H = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -205,7 +205,7 @@ void ObjectGridLoader::LoadN(void)
         }
     }
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_MAPS, "%u GameObjects, %u Creatures, and %u Corpses/Bones loaded for grid %u on map %u", i_gameObjects, i_creatures, i_corpses, i_grid.GetGridId(), i_map->GetId());
+    LOG_DEBUG("maps", "%u GameObjects, %u Creatures, and %u Corpses/Bones loaded for grid %u on map %u", i_gameObjects, i_creatures, i_corpses, i_grid.GetGridId(), i_map->GetId());
 #endif
 }
 
@@ -216,7 +216,7 @@ void ObjectGridUnloader::Visit(GridRefManager<T> &m)
     {
         T *obj = m.getFirst()->GetSource();
         // if option set then object already saved at this moment
-        //if (!sWorld->getBoolConfig(CONFIG_SAVE_RESPAWN_TIME_IMMEDIATELY))
+        //if (!sGameConfig->GetBoolConfig("SaveRespawnTimeImmediately"))
         //    obj->SaveRespawnTime();
         //Some creatures may summon other temp summons in CleanupsBeforeDelete()
         //So we need this even after cleaner (maybe we can remove cleaner)

@@ -1,12 +1,10 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
 
 #include "DynamicTree.h"
-//#include "QuadTree.h"
-//#include "RegularGrid.h"
 #include "BoundingIntervalHierarchyWrapper.h"
 
 #include "Log.h"
@@ -40,15 +38,9 @@ template<> struct BoundsTrait< GameObjectModel> {
     static void getBounds2(const GameObjectModel* g, G3D::AABox& out) { out = g->getBounds();}
 };
 
-/*
-static bool operator == (const GameObjectModel& mdl, const GameObjectModel& mdl2){
-    return &mdl == &mdl2;
-}
-*/
-
 typedef RegularGrid2D<GameObjectModel, BIHWrap<GameObjectModel> > ParentTree;
 
-struct DynTreeImpl : public ParentTree/*, public Intersectable*/
+struct DynTreeImpl : public ParentTree
 {
     typedef GameObjectModel Model;
     typedef ParentTree base;

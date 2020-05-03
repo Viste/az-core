@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -52,6 +52,7 @@
 #include "ArenaSpectator.h"
 #include "DynamicVisibility.h"
 #include "AccountMgr.h"
+#include "DisableMgr.h"
 
 #ifdef ELUNA
 #include "LuaEngine.h"
@@ -278,12 +279,12 @@ i_motionMaster(new MotionMaster(this)), m_regenTimer(0), m_ThreatManager(this), 
 bool GlobalCooldownMgr::HasGlobalCooldown(SpellInfo const* spellInfo) const
 {
     GlobalCooldownList::const_iterator itr = m_GlobalCooldowns.find(spellInfo->StartRecoveryCategory);
-    return itr != m_GlobalCooldowns.end() && itr->second.duration && getMSTimeDiff(itr->second.cast_time, World::GetGameTimeMS()) < itr->second.duration;
+    return itr != m_GlobalCooldowns.end() && itr->second.duration && getMSTimeDiff(itr->second.cast_time, GameTime::GetGameTimeMS()) < itr->second.duration;
 }
 
 void GlobalCooldownMgr::AddGlobalCooldown(SpellInfo const* spellInfo, uint32 gcd)
 {
-    m_GlobalCooldowns[spellInfo->StartRecoveryCategory] = GlobalCooldown(gcd, World::GetGameTimeMS());
+    m_GlobalCooldowns[spellInfo->StartRecoveryCategory] = GlobalCooldown(gcd, GameTime::GetGameTimeMS());
 }
 
 void GlobalCooldownMgr::CancelGlobalCooldown(SpellInfo const* spellInfo)
@@ -300,8 +301,10 @@ Unit::~Unit()
         if (m_currentSpells[i])
         {
             m_currentSpells[i]->SetReferencedFromCurrent(false);
-            m_currentSpells[i] = NULL;
+            m_currentSpells[i] = nullptr;
         }
+
+    m_Events.KillAllEvents(true);
 
     _DeleteRemovedAuras();
 
@@ -446,7 +449,7 @@ void Unit::SendMonsterMove(float NewPosX, float NewPosY, float NewPosZ, uint32 T
 
     data << uint8(0);                                       // new in 3.1
     data << GetPositionX() << GetPositionY() << GetPositionZ() + GetHoverHeight();
-    data << World::GetGameTimeMS();
+    data << GameTime::GetGameTimeMS();
     data << uint8(0);
     data << uint32(sf);
     data << TransitTime;                                           // Time in between points
@@ -801,7 +804,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
     }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("DealDamageStart");
+    LOG_DEBUG("server", "DealDamageStart");
 #endif
 
     uint32 health = victim->GetHealth();
@@ -872,7 +875,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
     if (health <= damage)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outStaticDebug("DealDamage: victim just died");
+        LOG_DEBUG("server", "DealDamage: victim just died");
 #endif
 
         //if (attacker && victim->GetTypeId() == TYPEID_PLAYER && victim != attacker)
@@ -883,7 +886,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
     else
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outStaticDebug("DealDamageAlive");
+        LOG_DEBUG("server", "DealDamageAlive");
 #endif
 
         //if (victim->GetTypeId() == TYPEID_PLAYER)
@@ -898,7 +901,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
         {
             // Part of Evade mechanics. DoT's and Thorns / Retribution Aura do not contribute to this
             if (damagetype != DOT && damage > 0 && !IS_PLAYER_GUID(victim->GetOwnerGUID()) && (!spellProto || !spellProto->HasAura(SPELL_AURA_DAMAGE_SHIELD)))
-                victim->ToCreature()->SetLastDamagedTime(sWorld->GetGameTime()+MAX_AGGRO_RESET_TIME);
+                victim->ToCreature()->SetLastDamagedTime(GameTime::GetGameTime()+MAX_AGGRO_RESET_TIME);
 
             if (attacker)
                 victim->AddThreat(attacker, float(damage), damageSchoolMask, spellProto);
@@ -906,7 +909,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
         else                                                // victim is a player
         {
             // random durability for items (HIT TAKEN)
-            if (roll_chance_f(sWorld->getRate(RATE_DURABILITY_LOSS_DAMAGE)))
+            if (roll_chance_f(sGameConfig->GetFloatConfig("DurabilityLossChance.Damage")))
             {
                 EquipmentSlots slot = EquipmentSlots(urand(0, EQUIPMENT_SLOT_END-1));
                 victim->ToPlayer()->DurabilityPointLossForEquipSlot(slot);
@@ -923,7 +926,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
         if (attacker && attacker->GetTypeId() == TYPEID_PLAYER)
         {
             // random durability for items (HIT DONE)
-            if (roll_chance_f(sWorld->getRate(RATE_DURABILITY_LOSS_DAMAGE)))
+            if (roll_chance_f(sGameConfig->GetFloatConfig("DurabilityLossChance.Damage")))
             {
                 EquipmentSlots slot = EquipmentSlots(urand(0, EQUIPMENT_SLOT_END-1));
                 attacker->ToPlayer()->DurabilityPointLossForEquipSlot(slot);
@@ -976,7 +979,7 @@ uint32 Unit::DealDamage(Unit* attacker, Unit* victim, uint32 damage, CleanDamage
     }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("DealDamageEnd returned %d damage", damage);
+    LOG_DEBUG("server", "DealDamageEnd returned %d damage", damage);
 #endif
 
     return damage;
@@ -1238,7 +1241,7 @@ void Unit::DealSpellDamage(SpellNonMeleeDamage* damageInfo, bool durabilityLoss)
     if (spellProto == NULL)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_UNITS, "Unit::DealSpellDamage has wrong damageInfo->SpellID: %u", damageInfo->SpellID);
+        LOG_DEBUG("entities.units", "Unit::DealSpellDamage has wrong damageInfo->SpellID: %u", damageInfo->SpellID);
 #endif
         return;
     }
@@ -2171,10 +2174,10 @@ void Unit::AttackerStateUpdate (Unit* victim, WeaponAttackType attType, bool ext
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
         if (GetTypeId() == TYPEID_PLAYER)
-            sLog->outStaticDebug("AttackerStateUpdate: (Player) %u attacked %u (TypeId: %u) for %u dmg, absorbed %u, blocked %u, resisted %u.",
+            LOG_DEBUG("server", "AttackerStateUpdate: (Player) %u attacked %u (TypeId: %u) for %u dmg, absorbed %u, blocked %u, resisted %u.",
                 GetGUIDLow(), victim->GetGUIDLow(), victim->GetTypeId(), damageInfo.damage, damageInfo.absorb, damageInfo.blocked_amount, damageInfo.resist);
         else
-            sLog->outStaticDebug("AttackerStateUpdate: (NPC)    %u attacked %u (TypeId: %u) for %u dmg, absorbed %u, blocked %u, resisted %u.",
+            LOG_DEBUG("server", "AttackerStateUpdate: (NPC)    %u attacked %u (TypeId: %u) for %u dmg, absorbed %u, blocked %u, resisted %u.",
                 GetGUIDLow(), victim->GetGUIDLow(), victim->GetTypeId(), damageInfo.damage, damageInfo.absorb, damageInfo.blocked_amount, damageInfo.resist);
 #endif
     }
@@ -2207,7 +2210,7 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* victim, WeaponAttackTy
     float parry_chance = victim->GetUnitParryChance();
 
     // Useful if want to specify crit & miss chances for melee, else it could be removed
-    //sLog->outStaticDebug("MELEE OUTCOME: miss %f crit %f dodge %f parry %f block %f", miss_chance, crit_chance, dodge_chance, parry_chance, block_chance);
+    //LOG_DEBUG("server", "MELEE OUTCOME: miss %f crit %f dodge %f parry %f block %f", miss_chance, crit_chance, dodge_chance, parry_chance, block_chance);
 
     return RollMeleeOutcomeAgainst(victim, attType, int32(crit_chance * 100), int32(miss_chance * 100), int32(dodge_chance * 100), int32(parry_chance * 100), int32(block_chance * 100));
 }
@@ -2295,7 +2298,7 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* victim, WeaponAttackTy
     if (!victim->HasInArc(M_PI, this) && !victim->HasAuraType(SPELL_AURA_IGNORE_HIT_DIRECTION))
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outStaticDebug("RollMeleeOutcomeAgainst: attack came from behind.");
+        LOG_DEBUG("server", "RollMeleeOutcomeAgainst: attack came from behind.");
 #endif
     }
     else
@@ -2405,7 +2408,7 @@ MeleeHitOutcome Unit::RollMeleeOutcomeAgainst(const Unit* victim, WeaponAttackTy
         if (GetTypeId() == TYPEID_UNIT && (ToCreature()->GetCreatureTemplate()->flags_extra & CREATURE_FLAG_EXTRA_NO_CRIT))
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("RollMeleeOutcomeAgainst: CRIT DISABLED)");
+            LOG_DEBUG("server", "RollMeleeOutcomeAgainst: CRIT DISABLED)");
 #endif
         }
         else
@@ -2487,7 +2490,7 @@ void Unit::SendMeleeAttackStart(Unit* victim, Player* sendTo)
     else
         SendMessageToSet(&data, true);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("WORLD: Sent SMSG_ATTACKSTART");
+    LOG_DEBUG("server", "WORLD: Sent SMSG_ATTACKSTART");
 #endif
 }
 
@@ -2503,7 +2506,7 @@ void Unit::SendMeleeAttackStop(Unit* victim)
     data << uint32(0);                                     //! Can also take the value 0x01, which seems related to updating rotation
     SendMessageToSet(&data, true);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("WORLD: Sent SMSG_ATTACKSTOP");
+    LOG_DEBUG("server", "WORLD: Sent SMSG_ATTACKSTOP");
 
     if (victim)
         sLog->outDetail("%s %u stopped attacking %s %u", (GetTypeId() == TYPEID_PLAYER ? "Player" : "Creature"), GetGUIDLow(), (victim->GetTypeId() == TYPEID_PLAYER ? "player" : "creature"), victim->GetGUIDLow());
@@ -2669,7 +2672,7 @@ SpellMissInfo Unit::MeleeSpellHitResult(Unit* victim, SpellInfo const* spell)
             case MELEE_HIT_PARRY: canParry = false; break;
             default:
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outStaticDebug("Spell %u SPELL_AURA_IGNORE_COMBAT_RESULT has unhandled state %d", (*i)->GetId(), (*i)->GetMiscValue());
+                LOG_DEBUG("server", "Spell %u SPELL_AURA_IGNORE_COMBAT_RESULT has unhandled state %d", (*i)->GetId(), (*i)->GetMiscValue());
 #endif
                 break;
         }
@@ -3311,7 +3314,7 @@ void Unit::SetCurrentCastedSpell(Spell* pSpell)
 
 void Unit::InterruptSpell(CurrentSpellTypes spellType, bool withDelayed, bool withInstant, bool bySelf)
 {
-    //sLog->outDebug(LOG_FILTER_UNITS, "Interrupt spell for unit %u.", GetEntry());
+    //LOG_DEBUG("entities.units", "Interrupt spell for unit %u.", GetEntry());
     Spell* spell = m_currentSpells[spellType];
     if (spell
         && (withDelayed || spell->getState() != SPELL_STATE_DELAYED)
@@ -3960,7 +3963,7 @@ void Unit::_UnapplyAura(AuraApplicationMap::iterator &i, AuraRemoveMode removeMo
     aurApp->SetRemoveMode(removeMode);
     Aura* aura = aurApp->GetBase();
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Aura %u now is remove mode %d", aura->GetId(), removeMode);
+    LOG_DEBUG("spells.aura", "Aura %u now is remove mode %d", aura->GetId(), removeMode);
 #endif
 
     // dead loop is killing the server probably
@@ -4797,7 +4800,7 @@ void Unit::DelayOwnedAuras(uint32 spellId, uint64 caster, int32 delaytime)
             // update for out of range group members (on 1 slot use)
             aura->SetNeedClientUpdateForTargets();
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Aura %u partially interrupted on unit %u, new duration: %u ms", aura->GetId(), GetGUIDLow(), aura->GetDuration());
+            LOG_DEBUG("spells.aura", "Aura %u partially interrupted on unit %u, new duration: %u ms", aura->GetId(), GetGUIDLow(), aura->GetDuration());
 #endif
         }
     }
@@ -5139,7 +5142,7 @@ uint32 Unit::GetDiseasesByCaster(uint64 casterGUID, uint8 mode)
                 {
                     Aura* aura = (*i)->GetBase();
                     if (aura && !aura->IsRemoved() && aura->GetDuration() > 0)
-                        if ((aura->GetApplyTime() + aura->GetMaxDuration()/1000 + 8) > (time(NULL) + aura->GetDuration()/1000))
+                        if ((aura->GetApplyTime() + aura->GetMaxDuration()/1000 + 8) > (GameTime::GetGameTime() + aura->GetDuration()/1000))
                             aura->SetDuration(aura->GetDuration()+3000);
                 }
             }
@@ -5707,7 +5710,7 @@ void Unit::SendSpellDamageImmune(Unit* target, uint32 spellId)
 void Unit::SendAttackStateUpdate(CalcDamageInfo* damageInfo)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_UNITS, "WORLD: Sending SMSG_ATTACKERSTATEUPDATE");
+    LOG_DEBUG("entities.units", "WORLD: Sending SMSG_ATTACKERSTATEUPDATE");
 #endif
 
     uint32 count = 1;
@@ -6821,7 +6824,7 @@ bool Unit::HandleDummyAuraProc(Unit* victim, uint32 damage, AuraEffect* triggere
                         if (AuraEffect* aurEff = victim->GetAuraEffect(SPELL_AURA_PERIODIC_DAMAGE, SPELLFAMILY_ROGUE, 0x100000, 0, 0, GetGUID()))
                             if (Aura* aur = aurEff->GetBase())
                                 if (!aur->IsRemoved() && aur->GetDuration() > 0)
-                                    if ((aur->GetApplyTime() + aur->GetMaxDuration()/1000 + 5) > (time(NULL) + aur->GetDuration()/1000) )
+                                    if ((aur->GetApplyTime() + aur->GetMaxDuration()/1000 + 5) > (GameTime::GetGameTime() + aur->GetDuration()/1000) )
                                     {
                                         aur->SetDuration(aur->GetDuration()+2000);
                                         return true;
@@ -9754,7 +9757,7 @@ Unit* Unit::GetCharm() const
 void Unit::SetMinion(Minion *minion, bool apply)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_UNITS, "SetMinion %u for %u, apply %u", minion->GetEntry(), GetEntry(), apply);
+    LOG_DEBUG("entities.units", "SetMinion %u for %u, apply %u", minion->GetEntry(), GetEntry(), apply);
 #endif
 
     if (apply)
@@ -12345,7 +12348,7 @@ void Unit::Mount(uint32 mount, uint32 VehicleId, uint32 creatureEntry)
 
         WorldPacket data(SMSG_MOVE_SET_COLLISION_HGT, GetPackGUID().size() + 4 + 4);
         data.append(GetPackGUID());
-        data << uint32(sWorld->GetGameTime());   // Packet counter
+        data << uint32(GameTime::GetGameTime());   // Packet counter
         data << player->GetCollisionHeight(true);
         player->GetSession()->SendPacket(&data);
     }
@@ -12365,7 +12368,7 @@ void Unit::Dismount()
     {
         WorldPacket data(SMSG_MOVE_SET_COLLISION_HGT, GetPackGUID().size() + 4 + 4);
         data.append(GetPackGUID());
-        data << uint32(sWorld->GetGameTime());   // Packet counter
+        data << uint32(GameTime::GetGameTime());   // Packet counter
         data << thisPlayer->GetCollisionHeight(false);
         thisPlayer->GetSession()->SendPacket(&data);
     }
@@ -13554,17 +13557,17 @@ Unit* Creature::SelectVictim()
     // pussywizard: if victim is not acceptable only due to mmaps, it may be for example a knockback, wait for a few secs before evading
     if (!target && !isWorldBoss() && !GetInstanceId() && IsAlive() && (!CanHaveThreatList() || !getThreatManager().isThreatListEmpty()))
         if (Unit* v = GetVictim())
-            if (isTargetNotAcceptableByMMaps(v->GetGUID(), sWorld->GetGameTime(), v))
+            if (isTargetNotAcceptableByMMaps(v->GetGUID(), GameTime::GetGameTime(), v))
                 if (_CanDetectFeignDeathOf(v) && CanCreatureAttack(v))
                 {
                     if (m_mmapNotAcceptableStartTime)
                     {
-                        if (sWorld->GetGameTime() <= m_mmapNotAcceptableStartTime+4)
+                        if (GameTime::GetGameTime() <= m_mmapNotAcceptableStartTime+4)
                             return NULL;
                     }
                     else
                     {
-                        m_mmapNotAcceptableStartTime = sWorld->GetGameTime();
+                        m_mmapNotAcceptableStartTime = GameTime::GetGameTime();
                         return NULL;
                     }
                 }
@@ -13803,7 +13806,7 @@ DiminishingLevels Unit::GetDiminishing(DiminishingGroup group)
             return DIMINISHING_LEVEL_1;
 
         // If last spell was casted more than 15 seconds ago - reset the count.
-        if (i->stack == 0 && getMSTimeDiff(i->hitTime, World::GetGameTimeMS()) > 15000)
+        if (i->stack == 0 && getMSTimeDiff(i->hitTime, GameTime::GetGameTimeMS()) > 15000)
         {
             i->hitCount = DIMINISHING_LEVEL_1;
             return DIMINISHING_LEVEL_1;
@@ -13826,7 +13829,7 @@ void Unit::IncrDiminishing(DiminishingGroup group)
             i->hitCount += 1;
         return;
     }
-    m_Diminishing.push_back(DiminishingReturn(group, World::GetGameTimeMS(), DIMINISHING_LEVEL_2));
+    m_Diminishing.push_back(DiminishingReturn(group, GameTime::GetGameTimeMS(), DIMINISHING_LEVEL_2));
 }
 
 float Unit::ApplyDiminishingToDuration(DiminishingGroup group, int32 &duration, Unit* caster, DiminishingLevels Level, int32 limitduration)
@@ -13905,7 +13908,7 @@ void Unit::ApplyDiminishingAura(DiminishingGroup group, bool apply)
             i->stack -= 1;
             // Remember time after last aura from group removed
             if (i->stack == 0)
-                i->hitTime = World::GetGameTimeMS();
+                i->hitTime = GameTime::GetGameTimeMS();
         }
         break;
     }
@@ -15147,7 +15150,7 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
             uint32 Id = i->aura->GetId();
-            sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting spell %u (triggered with value by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), Id);
+            LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting spell %u (triggered with value by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), Id);
 #endif
             takeCharges = true;
         }
@@ -15173,7 +15176,7 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                 case SPELL_AURA_PROC_TRIGGER_SPELL:
                 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting spell %u (triggered by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
+                    LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting spell %u (triggered by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
 #endif
                     // Don`t drop charge or add cooldown for not started trigger
                     if (HandleProcTriggerSpell(target, damage, triggeredByAura, procSpell, procFlag, procExtra, cooldown))
@@ -15194,7 +15197,7 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                 case SPELL_AURA_DUMMY:
                 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting spell id %u (triggered by %s dummy aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
+                    LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting spell id %u (triggered by %s dummy aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
 #endif
                     if (HandleDummyAuraProc(target, damage, triggeredByAura, procSpell, procFlag, procExtra, cooldown))
                         takeCharges = true;
@@ -15204,13 +15207,13 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                 case SPELL_AURA_MOD_SPELL_CRIT_CHANCE:
                 case SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN:
                 case SPELL_AURA_MOD_MELEE_HASTE:
-                    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting spell id %u (triggered by %s aura of spell %u)", spellInfo->Id, isVictim ? "a victim's" : "an attacker's", triggeredByAura->GetId());
+                    LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting spell id %u (triggered by %s aura of spell %u)", spellInfo->Id, isVictim ? "a victim's" : "an attacker's", triggeredByAura->GetId());
                     takeCharges = true;
                     break;
                 case SPELL_AURA_OVERRIDE_CLASS_SCRIPTS:
                 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting spell id %u (triggered by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
+                    LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting spell id %u (triggered by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
 #endif
                     if (HandleOverrideClassScriptAuraProc(target, damage, triggeredByAura, procSpell, cooldown))
                         takeCharges = true;
@@ -15219,7 +15222,7 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                 case SPELL_AURA_RAID_PROC_FROM_CHARGE_WITH_VALUE:
                 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting mending (triggered by %s dummy aura of spell %u)",
+                    LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting mending (triggered by %s dummy aura of spell %u)",
                         (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
 #endif
                     if (damage > 0)
@@ -15232,7 +15235,7 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                 case SPELL_AURA_RAID_PROC_FROM_CHARGE:
                 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting mending (triggered by %s dummy aura of spell %u)",
+                    LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting mending (triggered by %s dummy aura of spell %u)",
                         (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
 #endif
                     HandleAuraRaidProcFromCharge(triggeredByAura);
@@ -15242,7 +15245,7 @@ void Unit::ProcDamageAndSpellFor(bool isVictim, Unit* target, uint32 procFlag, u
                 case SPELL_AURA_PROC_TRIGGER_SPELL_WITH_VALUE:
                 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "ProcDamageAndSpell: casting spell %u (triggered with value by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
+                    LOG_DEBUG("spells.aura", "ProcDamageAndSpell: casting spell %u (triggered with value by %s aura of spell %u)", spellInfo->Id, (isVictim?"a victim's":"an attacker's"), triggeredByAura->GetId());
 #endif
 
                     if (HandleProcTriggerSpell(target, damage, triggeredByAura, procSpell, procFlag, procExtra, cooldown))
@@ -15926,7 +15929,7 @@ float Unit::GetAPMultiplier(WeaponAttackType attType, bool normalized)
 
 bool Unit::IsUnderLastManaUseEffect() const
 {
-    return  getMSTimeDiff(m_lastManaUse, World::GetGameTimeMS()) < 5000;
+    return  getMSTimeDiff(m_lastManaUse, GameTime::GetGameTimeMS()) < 5000;
 }
 
 void Unit::SetContestedPvP(Player* attackedPlayer)
@@ -16214,7 +16217,7 @@ bool Unit::HandleAuraRaidProcFromChargeWithValue(AuraEffect* triggeredByAura)
     if (!(spellProto->SpellFamilyName == SPELLFAMILY_PRIEST && spellProto->SpellFamilyFlags[1] & 0x20))
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Unit::HandleAuraRaidProcFromChargeWithValue, received not handled spell: %u", spellProto->Id);
+        LOG_DEBUG("spells.aura", "Unit::HandleAuraRaidProcFromChargeWithValue, received not handled spell: %u", spellProto->Id);
 #endif
         return false;
     }
@@ -16523,7 +16526,7 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
     if (!spiritOfRedemption)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outStaticDebug("SET JUST_DIED");
+        LOG_DEBUG("server", "SET JUST_DIED");
 #endif
         victim->setDeathState(JUST_DIED);
     }
@@ -16547,12 +16550,12 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
         plrVictim->SetPvPDeath(player != NULL);
 
         // only if not player and not controlled by player pet. And not at BG
-        if ((durabilityLoss && !player && !plrVictim->InBattleground()) || (player && sWorld->getBoolConfig(CONFIG_DURABILITY_LOSS_IN_PVP)))
+        if ((durabilityLoss && !player && !plrVictim->InBattleground()) || (player && sGameConfig->GetBoolConfig("DurabilityLoss.InPvP")))
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("We are dead, losing %f percent durability", sWorld->getRate(RATE_DURABILITY_LOSS_ON_DEATH));
+            LOG_DEBUG("server", "We are dead, losing %f percent durability", sGameConfig->GetFloatConfig("DurabilityLoss.OnDeath"));
 #endif
-            plrVictim->DurabilityLossAll(sWorld->getRate(RATE_DURABILITY_LOSS_ON_DEATH), false);
+            plrVictim->DurabilityLossAll(sGameConfig->GetFloatConfig("DurabilityLoss.OnDeath"), false);
             // durability lost message
             WorldPacket data(SMSG_DURABILITY_DAMAGE_DEATH, 0);
             plrVictim->GetSession()->SendPacket(&data);
@@ -16572,7 +16575,7 @@ void Unit::Kill(Unit* killer, Unit* victim, bool durabilityLoss, WeaponAttackTyp
     else                                                // creature died
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outStaticDebug("DealDamageNotPlayer");
+        LOG_DEBUG("server", "DealDamageNotPlayer");
 #endif
 
         if (!creature->IsPet() && creature->GetLootMode() > 0)
@@ -16912,7 +16915,7 @@ void Unit::SetFeared(bool apply)
             caster = ObjectAccessor::GetUnit(*this, fearAuras.front()->GetCasterGUID());
         if (!caster)
             caster = getAttackerForHelper();
-        GetMotionMaster()->MoveFleeing(caster, fearAuras.empty() ? sWorld->getIntConfig(CONFIG_CREATURE_FAMILY_FLEE_DELAY) : 0);             // caster == NULL processed in MoveFleeing
+        GetMotionMaster()->MoveFleeing(caster, fearAuras.empty() ? sGameConfig->GetIntConfig("CreatureFamilyFleeDelay") : 0);             // caster == NULL processed in MoveFleeing
     }
     else
     {
@@ -16996,7 +16999,7 @@ bool Unit::SetCharmedBy(Unit* charmer, CharmType type, AuraApplication const* au
     ASSERT((type == CHARM_TYPE_VEHICLE) == IsVehicle());
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_UNITS, "SetCharmedBy: charmer %u (GUID %u), charmed %u (GUID %u), type %u.", charmer->GetEntry(), charmer->GetGUIDLow(), GetEntry(), GetGUIDLow(), uint32(type));
+    LOG_DEBUG("entities.units", "SetCharmedBy: charmer %u (GUID %u), charmed %u (GUID %u), type %u.", charmer->GetEntry(), charmer->GetGUIDLow(), GetEntry(), GetGUIDLow(), uint32(type));
 #endif
 
     if (this == charmer)
@@ -17134,7 +17137,7 @@ bool Unit::SetCharmedBy(Unit* charmer, CharmType type, AuraApplication const* au
                             GetCharmInfo()->SetPetNumber(sObjectMgr->GeneratePetNumber(), true);
 
                         // if charmed two demons the same session, the 2nd gets the 1st one's name
-                        SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(time(NULL))); // cast can't be helped
+                        SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(GameTime::GetGameTime())); // cast can't be helped
                     }
                 }
                 GetMotionMaster()->MoveFollow(charmer, PET_FOLLOW_DIST, GetFollowAngle());
@@ -18217,7 +18220,7 @@ void Unit::_EnterVehicle(Vehicle* vehicle, int8 seatId, AuraApplication const* a
             if (seatId >= 0 && seatId != GetTransSeat())
             {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_VEHICLES, "EnterVehicle: %u leave vehicle %u seat %d and enter %d.", GetEntry(), m_vehicle->GetBase()->GetEntry(), GetTransSeat(), seatId);
+                LOG_DEBUG("entities.vehicles", "EnterVehicle: %u leave vehicle %u seat %d and enter %d.", GetEntry(), m_vehicle->GetBase()->GetEntry(), GetTransSeat(), seatId);
 #endif
                 ChangeSeat(seatId);
             }
@@ -18227,7 +18230,7 @@ void Unit::_EnterVehicle(Vehicle* vehicle, int8 seatId, AuraApplication const* a
         else
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_VEHICLES, "EnterVehicle: %u exit %u and enter %u.", GetEntry(), m_vehicle->GetBase()->GetEntry(), vehicle->GetBase()->GetEntry());
+            LOG_DEBUG("entities.vehicles", "EnterVehicle: %u exit %u and enter %u.", GetEntry(), m_vehicle->GetBase()->GetEntry(), vehicle->GetBase()->GetEntry());
 #endif
             ExitVehicle();
         }
@@ -18359,7 +18362,7 @@ void Unit::_ExitVehicle(Position const* exitPosition)
     AddUnitState(UNIT_STATE_MOVE);
 
     if (player)
-        player->SetFallInformation(time(NULL), GetPositionZ());
+        player->SetFallInformation(GameTime::GetGameTime(), GetPositionZ());
     else if (HasUnitMovementFlag(MOVEMENTFLAG_ROOT))
     {
         WorldPacket data(SMSG_SPLINE_MOVE_UNROOT, 8);
@@ -18440,7 +18443,7 @@ void Unit::BuildMovementPacket(ByteBuffer *data) const
     else
         *data << uint32(GetUnitMovementFlags());            // movement flags
     *data << uint16(GetExtraUnitMovementFlags());       // 2.3.0
-    *data << uint32(World::GetGameTimeMS());                       // time / counter
+    *data << uint32(GameTime::GetGameTimeMS());                       // time / counter
     *data << GetPositionX();
     *data << GetPositionY();
     *data << GetPositionZ() + GetHoverHeight();
@@ -18599,7 +18602,7 @@ void Unit::SendThreatListUpdate()
     {
         uint32 count = getThreatManager().getThreatList().size();
 
-        //sLog->outDebug(LOG_FILTER_UNITS, "WORLD: Send SMSG_THREAT_UPDATE Message");
+        //LOG_DEBUG("entities.units", "WORLD: Send SMSG_THREAT_UPDATE Message");
         WorldPacket data(SMSG_THREAT_UPDATE, 8 + count * 8);
         data.append(GetPackGUID());
         data << uint32(count);
@@ -18620,7 +18623,7 @@ void Unit::SendChangeCurrentVictimOpcode(HostileReference* pHostileReference)
         uint32 count = getThreatManager().getThreatList().size();
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_UNITS, "WORLD: Send SMSG_HIGHEST_THREAT_UPDATE Message");
+        LOG_DEBUG("entities.units", "WORLD: Send SMSG_HIGHEST_THREAT_UPDATE Message");
 #endif
         WorldPacket data(SMSG_HIGHEST_THREAT_UPDATE, 8 + 8 + count * 8);
         data.append(GetPackGUID());
@@ -18639,7 +18642,7 @@ void Unit::SendChangeCurrentVictimOpcode(HostileReference* pHostileReference)
 void Unit::SendClearThreatListOpcode()
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_UNITS, "WORLD: Send SMSG_THREAT_CLEAR Message");
+    LOG_DEBUG("entities.units", "WORLD: Send SMSG_THREAT_CLEAR Message");
 #endif
     WorldPacket data(SMSG_THREAT_CLEAR, 8);
     data.append(GetPackGUID());
@@ -18649,7 +18652,7 @@ void Unit::SendClearThreatListOpcode()
 void Unit::SendRemoveFromThreatListOpcode(HostileReference* pHostileReference)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_UNITS, "WORLD: Send SMSG_THREAT_REMOVE Message");
+    LOG_DEBUG("entities.units", "WORLD: Send SMSG_THREAT_REMOVE Message");
 #endif
     WorldPacket data(SMSG_THREAT_REMOVE, 8 + 8);
     data.append(GetPackGUID());
@@ -18683,7 +18686,7 @@ void Unit::RewardRage(uint32 damage, uint32 weaponSpeedHitFactor, bool attacker)
             addRage *= 3.0f;
     }
 
-    addRage *= sWorld->getRate(RATE_POWER_RAGE_INCOME);
+    addRage *= sGameConfig->GetFloatConfig("Rate.Rage.Income");
 
     ModifyPower(POWER_RAGE, uint32(addRage * 10));
 }
@@ -18731,27 +18734,27 @@ void Unit::OutDebugInfo() const
     if (IsInWorld())
         sLog->outString("Mapid %u", GetMapId());
 
-    sLog->outStringInLine("Summon Slot: ");
+    sLog->outString("Summon Slot: ");
     for (uint32 i = 0; i < MAX_SUMMON_SLOT; ++i)
-        sLog->outStringInLine(UI64FMTD", ", m_SummonSlot[i]);
+        sLog->outString(UI64FMTD", ", m_SummonSlot[i]);
     sLog->outString();
 
-    sLog->outStringInLine("Controlled List: ");
+    sLog->outString("Controlled List: ");
     for (ControlSet::const_iterator itr = m_Controlled.begin(); itr != m_Controlled.end(); ++itr)
-        sLog->outStringInLine(UI64FMTD", ", (*itr)->GetGUID());
+        sLog->outString(UI64FMTD", ", (*itr)->GetGUID());
     sLog->outString();
 
-    sLog->outStringInLine("Aura List: ");
+    sLog->outString("Aura List: ");
     for (AuraApplicationMap::const_iterator itr = m_appliedAuras.begin(); itr != m_appliedAuras.end(); ++itr)
-        sLog->outStringInLine("%u, ", itr->first);
+        sLog->outString("%u, ", itr->first);
     sLog->outString();
 
     if (IsVehicle())
     {
-        sLog->outStringInLine("Passenger List: ");
+        sLog->outString("Passenger List: ");
         for (SeatMap::iterator itr = GetVehicleKit()->Seats.begin(); itr != GetVehicleKit()->Seats.end(); ++itr)
             if (Unit* passenger = ObjectAccessor::GetUnit(*GetVehicleBase(), itr->second.Passenger.Guid))
-                sLog->outStringInLine(UI64FMTD", ", passenger->GetGUID());
+                sLog->outString(UI64FMTD", ", passenger->GetGUID());
         sLog->outString();
     }
 
@@ -18915,7 +18918,7 @@ void Unit::PetSpellFail(const SpellInfo* spellInfo, Unit* target, uint32 result)
     if (!charmInfo || GetTypeId() != TYPEID_UNIT)
         return;
 
-    if ((MMAP::MMapFactory::IsPathfindingEnabled(GetMap()) || result != SPELL_FAILED_LINE_OF_SIGHT) && target)
+    if ((DisableMgr::IsPathfindingEnabled(GetMap()) || result != SPELL_FAILED_LINE_OF_SIGHT) && target)
     {
         if ((result == SPELL_FAILED_LINE_OF_SIGHT || result == SPELL_FAILED_OUT_OF_RANGE) || !ToCreature()->HasReactState(REACT_PASSIVE))
             if (Unit *owner = GetOwner())
@@ -19362,7 +19365,7 @@ void Unit::BuildValuesUpdate(uint8 updateType, ByteBuffer* data, Player* target)
 
                 if (creature)
                 {
-                    if (sWorld->getIntConfig(CONFIG_INSTANT_TAXI) == 2 && appendValue & UNIT_NPC_FLAG_FLIGHTMASTER)
+                    if (sGameConfig->GetIntConfig("InstantFlightPaths") == 2 && appendValue & UNIT_NPC_FLAG_FLIGHTMASTER)
                         appendValue |= UNIT_NPC_FLAG_GOSSIP; // flight masters need NPC gossip flag to show instant flight toggle option
 
                     if (!target->CanSeeSpellClickOn(creature))
@@ -19466,7 +19469,7 @@ void Unit::BuildValuesUpdate(uint8 updateType, ByteBuffer* data, Player* target)
             // FG: pretend that OTHER players in own group are friendly ("blue")
             else if (index == UNIT_FIELD_BYTES_2 || index == UNIT_FIELD_FACTIONTEMPLATE)
             {
-                if (IsControlledByPlayer() && target != this && sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP) && IsInRaidWith(target))
+                if (IsControlledByPlayer() && target != this && sGameConfig->GetBoolConfig("AllowTwoSide.Interaction.Group") && IsInRaidWith(target))
                 {
                     FactionTemplateEntry const* ft1 = GetFactionTemplateEntry();
                     FactionTemplateEntry const* ft2 = target->GetFactionTemplateEntry();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -22,13 +22,15 @@
 #include "DisableMgr.h"
 #include "Group.h"
 #include "ScriptMgr.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 void WorldSession::HandleBattlemasterHelloOpcode(WorldPacket & recvData)
 {
     uint64 guid;
     recvData >> guid;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd CMSG_BATTLEMASTER_HELLO Message from (GUID: %u TypeId:%u)", GUID_LOPART(guid), GuidHigh2TypeId(GUID_HIPART(guid)));
+    LOG_DEBUG("network", "WORLD: Recvd CMSG_BATTLEMASTER_HELLO Message from (GUID: %u TypeId:%u)", GUID_LOPART(guid), GuidHigh2TypeId(GUID_HIPART(guid)));
 #endif
 
     Creature* unit = GetPlayer()->GetMap()->GetCreature(guid);
@@ -269,7 +271,7 @@ void WorldSession::HandleBattlemasterJoinOpcode(WorldPacket & recvData)
 void WorldSession::HandleBattlegroundPlayerPositionsOpcode(WorldPacket& /*recvData*/)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd MSG_BATTLEGROUND_PLAYER_POSITIONS Message");
+    LOG_DEBUG("network", "WORLD: Recvd MSG_BATTLEGROUND_PLAYER_POSITIONS Message");
 #endif
 
     Battleground* bg = _player->GetBattleground();
@@ -322,7 +324,7 @@ void WorldSession::HandleBattlegroundPlayerPositionsOpcode(WorldPacket& /*recvDa
 void WorldSession::HandlePVPLogDataOpcode(WorldPacket & /*recvData*/)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd MSG_PVP_LOG_DATA Message");
+    LOG_DEBUG("network", "WORLD: Recvd MSG_PVP_LOG_DATA Message");
 #endif
 
     Battleground* bg = _player->GetBattleground();
@@ -338,14 +340,14 @@ void WorldSession::HandlePVPLogDataOpcode(WorldPacket & /*recvData*/)
     SendPacket(&data);
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Sent MSG_PVP_LOG_DATA Message");
+    LOG_DEBUG("network", "WORLD: Sent MSG_PVP_LOG_DATA Message");
 #endif
 }
 
 void WorldSession::HandleBattlefieldListOpcode(WorldPacket &recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd CMSG_BATTLEFIELD_LIST Message");
+    LOG_DEBUG("network", "WORLD: Recvd CMSG_BATTLEFIELD_LIST Message");
 #endif
 
     uint32 bgTypeId;
@@ -472,7 +474,7 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPacket &recvData)
                 bgQueue.RemovePlayer(_player->GetGUID(), false, queueSlot);
                 _player->RemoveBattlegroundQueueId(bgQueueTypeId);
                 // track if player refuses to join the BG after being invited
-                if (bg->isBattleground() && sWorld->getBoolConfig(CONFIG_BATTLEGROUND_TRACK_DESERTERS) &&
+                if (bg->isBattleground() && sGameConfig->GetBoolConfig("Battleground.TrackDeserters.Enable") &&
                     (bg->GetStatus() == STATUS_IN_PROGRESS || bg->GetStatus() == STATUS_WAIT_JOIN))
                 {
                     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_DESERTER_TRACK);
@@ -490,7 +492,7 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPacket &recvData)
 void WorldSession::HandleBattlefieldLeaveOpcode(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd CMSG_LEAVE_BATTLEFIELD Message");
+    LOG_DEBUG("network", "WORLD: Recvd CMSG_LEAVE_BATTLEFIELD Message");
 #endif
 
     recvData.read_skip<uint8>();                           // unk1
@@ -545,7 +547,7 @@ void WorldSession::HandleBattlefieldStatusOpcode(WorldPacket & /*recvData*/)
             if (!bg)
                 continue;
 
-            uint32 remainingTime = (World::GetGameTimeMS() < ginfo.RemoveInviteTime ? getMSTimeDiff(World::GetGameTimeMS(), ginfo.RemoveInviteTime) : 1);
+            uint32 remainingTime = (GameTime::GetGameTimeMS() < ginfo.RemoveInviteTime ? getMSTimeDiff(GameTime::GetGameTimeMS(), ginfo.RemoveInviteTime) : 1);
             sBattlegroundMgr->BuildBattlegroundStatusPacket(&data, bg, i, STATUS_WAIT_JOIN, remainingTime, 0, ginfo.ArenaType, TEAM_NEUTRAL, bg->isRated(), ginfo.BgTypeId);
             SendPacket(&data);
         }
@@ -562,7 +564,7 @@ void WorldSession::HandleBattlefieldStatusOpcode(WorldPacket & /*recvData*/)
                 continue;
 
             uint32 avgWaitTime = bgQueue.GetAverageQueueWaitTime(&ginfo);
-            sBattlegroundMgr->BuildBattlegroundStatusPacket(&data, bgt, i, STATUS_WAIT_QUEUE, avgWaitTime, getMSTimeDiff(ginfo.JoinTime, World::GetGameTimeMS()), ginfo.ArenaType, TEAM_NEUTRAL, ginfo.IsRated);
+            sBattlegroundMgr->BuildBattlegroundStatusPacket(&data, bgt, i, STATUS_WAIT_QUEUE, avgWaitTime, getMSTimeDiff(ginfo.JoinTime, GameTime::GetGameTimeMS()), ginfo.ArenaType, TEAM_NEUTRAL, ginfo.IsRated);
             SendPacket(&data);
         }
     }
@@ -724,7 +726,7 @@ void WorldSession::HandleBattlemasterJoinArena(WorldPacket & recvData)
         if (isRated)
         {
             // pussywizard: for rated matches check if season is in progress!
-            if (!sWorld->getBoolConfig(CONFIG_ARENA_SEASON_IN_PROGRESS))
+            if (!sGameConfig->GetBoolConfig("Arena.ArenaSeason.InProgress"))
                 return;
 
             ateamId = _player->GetArenaTeamId(arenaslot);
@@ -795,13 +797,13 @@ void WorldSession::HandleReportPvPAFK(WorldPacket & recvData)
     if (!reportedPlayer)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_BATTLEGROUND, "WorldSession::HandleReportPvPAFK: player not found");
+        LOG_DEBUG("bg", "WorldSession::HandleReportPvPAFK: player not found");
 #endif
         return;
     }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_BATTLEGROUND, "WorldSession::HandleReportPvPAFK: %s reported %s", _player->GetName().c_str(), reportedPlayer->GetName().c_str());
+    LOG_DEBUG("bg", "WorldSession::HandleReportPvPAFK: %s reported %s", _player->GetName().c_str(), reportedPlayer->GetName().c_str());
 #endif
 
     reportedPlayer->ReportedAfkBy(_player);

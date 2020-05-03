@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -14,7 +14,6 @@
 #include <ace/OS_NS_string.h>
 #include <ace/Reactor.h>
 #include <ace/Auto_Ptr.h>
-
 #include "WorldSocket.h"
 #include "Common.h"
 #include "Player.h"
@@ -33,6 +32,9 @@
 #include "PacketLog.h"
 #include "ScriptMgr.h"
 #include "AccountMgr.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
@@ -53,7 +55,7 @@ struct ServerPktHeader
         uint8 headerIndex=0;
         if (isLargePacket())
         {
-            sLog->outDebug(LOG_FILTER_NETWORKIO, "initializing large server to client packet. Size: %u, cmd: %u", size, cmd);
+            LOG_DEBUG("network", "initializing large server to client packet. Size: %u, cmd: %u", size, cmd);
             header[headerIndex++] = 0x80|(0xFF &(size>>16));
         }
         header[headerIndex++] = 0xFF &(size>>8);
@@ -122,7 +124,7 @@ bool WorldSocket::IsClosed(void) const
 void WorldSocket::CloseSocket(std::string const& reason)
 {
     if (!reason.empty())
-        sLog->outDebug(LOG_FILTER_CLOSE_SOCKET, "Socket closed because of: %s", reason.c_str());
+        LOG_DEBUG("network", "Socket closed because of: %s", reason.c_str());
 
     {
         ACE_GUARD (LockType, Guard, m_OutBufferLock);
@@ -289,7 +291,7 @@ int WorldSocket::handle_input(ACE_HANDLE)
             }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("WorldSocket::handle_input: Peer error closing connection errno = %s", ACE_OS::strerror (errno));
+            LOG_DEBUG("server", "WorldSocket::handle_input: Peer error closing connection errno = %s", ACE_OS::strerror (errno));
 #endif
 
             errno = ECONNRESET;
@@ -298,7 +300,7 @@ int WorldSocket::handle_input(ACE_HANDLE)
         case 0:
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("WorldSocket::handle_input: Peer has closed connection");
+            LOG_DEBUG("server", "WorldSocket::handle_input: Peer has closed connection");
 #endif
 
             errno = ECONNRESET;
@@ -722,9 +724,9 @@ int WorldSocket::ProcessIncoming(WorldPacket* new_pct)
     catch (ByteBufferException const&)
     {
         sLog->outError("WorldSocket::ProcessIncoming ByteBufferException occured while parsing an instant handled packet (opcode: %u) from client %s, accountid=%i. Disconnected client.", opcode, GetRemoteAddress().c_str(), m_Session?m_Session->GetAccountId():-1);
-        if (sLog->IsOutDebug())
+        if (sLog->ShouldLog("network", LOG_LEVEL_DEBUG))
         {
-            sLog->outDebug(LOG_FILTER_NETWORKIO, "Dumping error causing packet:");
+            LOG_DEBUG("network", "Dumping error causing packet:");
             new_pct->hexlike();
         }
 
@@ -752,7 +754,7 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
     WorldPacket packet, SendAddonPacked;
 
     BigNumber k;
-    bool wardenActive = sWorld->getBoolConfig(CONFIG_WARDEN_ENABLED);
+    bool wardenActive = sGameConfig->GetBoolConfig("Warden.Enabled");
 
     if (sWorld->IsClosed())
     {
@@ -804,7 +806,7 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
     Field* fields = result->Fetch();
 
     uint8 expansion = fields[5].GetUInt8();
-    uint32 world_expansion = sWorld->getIntConfig(CONFIG_EXPANSION);
+    uint32 world_expansion = sGameConfig->GetIntConfig("Expansion");
     if (expansion > world_expansion)
         expansion = world_expansion;
 
@@ -850,7 +852,7 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
     //! Negative mutetime indicates amount of seconds to be muted effective on next login - which is now.
     if (mutetime < 0)
     {
-        mutetime = time(NULL) + llabs(mutetime);
+        mutetime = GameTime::GetGameTime() + llabs(mutetime);
 
         PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_UPD_MUTE_TIME_LOGIN);
 
@@ -918,7 +920,7 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
     // Check locked state for server
     AccountTypes allowedAccountType = sWorld->GetPlayerSecurityLimit();
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "Allowed Level: %u Player Level %u", allowedAccountType, AccountTypes(security));
+    LOG_DEBUG("network", "Allowed Level: %u Player Level %u", allowedAccountType, AccountTypes(security));
 #endif
     if (AccountTypes(security) < allowedAccountType)
     {
@@ -957,7 +959,7 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
     }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("WorldSocket::HandleAuthSession: Client '%s' authenticated successfully from %s.",
+    LOG_DEBUG("server", "WorldSocket::HandleAuthSession: Client '%s' authenticated successfully from %s.",
                 account.c_str(),
                 address.c_str());
 #endif
@@ -1021,7 +1023,7 @@ int WorldSocket::HandleAuthSession(WorldPacket& recvPacket)
         m_Session->InitWarden(&k, os);
 
     // Sleep this Network thread for
-    uint32 sleepTime = sWorld->getIntConfig(CONFIG_SESSION_ADD_DELAY);
+    uint32 sleepTime = sGameConfig->GetIntConfig("SessionAddDelay");
     ACE_OS::sleep (ACE_Time_Value (0, sleepTime));
 
     sWorld->AddSession (m_Session);
@@ -1051,7 +1053,7 @@ int WorldSocket::HandlePing(WorldPacket& recvPacket)
         {
             ++m_OverSpeedPings;
 
-            uint32 max_count = sWorld->getIntConfig (CONFIG_MAX_OVERSPEED_PINGS);
+            uint32 max_count = sGameConfig->GetIntConfig("MaxOverspeedPings");
 
             if (max_count && m_OverSpeedPings > max_count)
             {

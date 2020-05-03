@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -22,9 +22,9 @@
 #include "Pet.h"
 #include "Player.h"
 #include "Vehicle.h"
-#include "World.h"
 #include "WorldPacket.h"
-
+#include "GameTime.h"
+#include "GameConfig.h"
 #include <cmath>
 
 ObjectAccessor::ObjectAccessor()
@@ -320,7 +320,7 @@ Corpse* ObjectAccessor::ConvertCorpseForPlayer(uint64 player_guid, bool insignia
     }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("Deleting Corpse and spawned bones.");
+    LOG_DEBUG("server", "Deleting Corpse and spawned bones.");
 #endif
 
     // Map can be NULL
@@ -340,7 +340,7 @@ Corpse* ObjectAccessor::ConvertCorpseForPlayer(uint64 player_guid, bool insignia
     // ignore bones creating option in case insignia
 
     if (map && corpse->IsPositionValid() && inWorld && (insignia ||
-        (map->IsBattlegroundOrArena() ? sWorld->getBoolConfig(CONFIG_DEATH_BONES_BG_OR_ARENA) : sWorld->getBoolConfig(CONFIG_DEATH_BONES_WORLD))) &&
+        (map->IsBattlegroundOrArena() ? sGameConfig->GetBoolConfig("Death.Bones.BattlegroundOrArena") : sGameConfig->GetBoolConfig("Death.Bones.World"))) &&
         !map->IsRemovalGrid(corpse->GetPositionX(), corpse->GetPositionY()))
     {
         // Create bones, don't change Corpse
@@ -387,7 +387,7 @@ Corpse* ObjectAccessor::ConvertCorpseForPlayer(uint64 player_guid, bool insignia
 
 void ObjectAccessor::RemoveOldCorpses()
 {
-    time_t now = time(NULL);
+    time_t now = GameTime::GetGameTime();
     Player2CorpsesMapType::iterator next;
     for (Player2CorpsesMapType::iterator itr = i_player2corpse.begin(); itr != i_player2corpse.end(); itr = next)
     {

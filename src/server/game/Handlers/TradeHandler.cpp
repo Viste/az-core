@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -7,7 +7,6 @@
 #include "Common.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
-#include "World.h"
 #include "ObjectAccessor.h"
 #include "Log.h"
 #include "Opcodes.h"
@@ -17,6 +16,7 @@
 #include "SocialMgr.h"
 #include "Language.h"
 #include "AccountMgr.h"
+#include "GameConfig.h"
 
 void WorldSession::SendTradeStatus(TradeStatus status)
 {
@@ -59,7 +59,7 @@ void WorldSession::SendTradeStatus(TradeStatus status)
 void WorldSession::HandleIgnoreTradeOpcode(WorldPacket& /*recvPacket*/)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Ignore Trade %u", _player->GetGUIDLow());
+    LOG_DEBUG("network", "WORLD: Ignore Trade %u", _player->GetGUIDLow());
 #endif
     // recvPacket.print_storage();
 }
@@ -67,7 +67,7 @@ void WorldSession::HandleIgnoreTradeOpcode(WorldPacket& /*recvPacket*/)
 void WorldSession::HandleBusyTradeOpcode(WorldPacket& /*recvPacket*/)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Busy Trade %u", _player->GetGUIDLow());
+    LOG_DEBUG("network", "WORLD: Busy Trade %u", _player->GetGUIDLow());
 #endif
     // recvPacket.print_storage();
 }
@@ -144,7 +144,7 @@ void WorldSession::moveItems(Item* myItems[], Item* hisItems[])
             {
                 // logging
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_NETWORKIO, "partner storing: %u", myItems[i]->GetGUIDLow());
+                LOG_DEBUG("network", "partner storing: %u", myItems[i]->GetGUIDLow());
 #endif
 
                 // adjust time (depends on /played)
@@ -157,7 +157,7 @@ void WorldSession::moveItems(Item* myItems[], Item* hisItems[])
             {
                 // logging
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_NETWORKIO, "player storing: %u", hisItems[i]->GetGUIDLow());
+                LOG_DEBUG("network", "player storing: %u", hisItems[i]->GetGUIDLow());
 #endif
 
                 // adjust time (depends on /played)
@@ -207,7 +207,7 @@ static void setAcceptTradeMode(TradeData* myTrade, TradeData* hisTrade, Item* *m
         if (Item* item = myTrade->GetItem(TradeSlots(i)))
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("player trade item %u bag: %u slot: %u", item->GetGUIDLow(), item->GetBagSlot(), item->GetSlot());
+            LOG_DEBUG("server", "player trade item %u bag: %u slot: %u", item->GetGUIDLow(), item->GetBagSlot(), item->GetSlot());
 #endif
             //Can return NULL
             myItems[i] = item;
@@ -217,7 +217,7 @@ static void setAcceptTradeMode(TradeData* myTrade, TradeData* hisTrade, Item* *m
         if (Item* item = hisTrade->GetItem(TradeSlots(i)))
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("partner trade item %u bag: %u slot: %u", item->GetGUIDLow(), item->GetBagSlot(), item->GetSlot());
+            LOG_DEBUG("server", "partner trade item %u bag: %u slot: %u", item->GetGUIDLow(), item->GetBagSlot(), item->GetSlot());
 #endif
             hisItems[i] = item;
             hisItems[i]->SetInTrade();
@@ -569,9 +569,9 @@ void WorldSession::HandleInitiateTradeOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (GetPlayer()->getLevel() < sWorld->getIntConfig(CONFIG_TRADE_LEVEL_REQ))
+    if (GetPlayer()->getLevel() < sGameConfig->GetIntConfig("LevelReq.Trade"))
     {
-        SendNotification(GetAcoreString(LANG_TRADE_REQ), sWorld->getIntConfig(CONFIG_TRADE_LEVEL_REQ));
+        SendNotification(GetAcoreString(LANG_TRADE_REQ), sGameConfig->GetIntConfig("LevelReq.Trade"));
         return;
     }
 
@@ -622,7 +622,7 @@ void WorldSession::HandleInitiateTradeOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_TRADE) && pOther->GetTeamId() != _player->GetTeamId())
+    if (!sGameConfig->GetBoolConfig("AllowTwoSide.trade") && pOther->GetTeamId() != _player->GetTeamId())
     {
         SendTradeStatus(TRADE_STATUS_WRONG_FACTION);
         return;
@@ -634,9 +634,9 @@ void WorldSession::HandleInitiateTradeOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (pOther->getLevel() < sWorld->getIntConfig(CONFIG_TRADE_LEVEL_REQ))
+    if (pOther->getLevel() < sGameConfig->GetIntConfig("LevelReq.Trade"))
     {
-        SendNotification(GetAcoreString(LANG_TRADE_OTHER_REQ), sWorld->getIntConfig(CONFIG_TRADE_LEVEL_REQ));
+        SendNotification(GetAcoreString(LANG_TRADE_OTHER_REQ), sGameConfig->GetIntConfig("LevelReq.Trade"));
         return;
     }
 

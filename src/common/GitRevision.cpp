@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+* Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
 * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
 */
 
@@ -19,6 +19,36 @@ char const* GitRevision::GetDate()
 char const* GitRevision::GetBranch()
 {
     return _BRANCH;
+}
+
+char const* GitRevision::GetCMakeCommand()
+{
+    return _CMAKE_COMMAND;
+}
+
+char const* GitRevision::GetCMakeVersion()
+{
+    return _CMAKE_VERSION;
+}
+
+char const* GitRevision::GetHostOSVersion()
+{
+    return _CMAKE_HOST_SYSTEM;
+}
+
+char const* GitRevision::GetBuildDirectory()
+{
+    return _BUILD_DIRECTORY;
+}
+
+char const* GitRevision::GetSourceDirectory()
+{
+    return _SOURCE_DIRECTORY;
+}
+
+char const* GitRevision::GetMySQLExecutable()
+{
+    return _MYSQL_EXECUTABLE;
 }
 
 #if AC_PLATFORM == AC_PLATFORM_WINDOWS

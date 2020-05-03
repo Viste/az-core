@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU AGPL3 v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2019 TrinityCore <https://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -29,7 +29,7 @@
     RaiseException(EXCEPTION_ASSERTION_FAILURE, 0, 2, execeptionArgs);
 #else
 // should be easily accessible in gdb
-extern "C" { char const* TrinityAssertionFailedMessage = nullptr; }
+extern "C" { AC_COMMON_API char const* TrinityAssertionFailedMessage = nullptr; }
 #define Crash(message) \
     TrinityAssertionFailedMessage = strdup(message); \
     *((volatile int*)nullptr) = 0; \

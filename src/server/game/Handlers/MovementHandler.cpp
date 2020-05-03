@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -31,7 +31,7 @@
 void WorldSession::HandleMoveWorldportAckOpcode(WorldPacket & /*recvData*/)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: got MSG_MOVE_WORLDPORT_ACK.");
+    LOG_DEBUG("network", "WORLD: got MSG_MOVE_WORLDPORT_ACK.");
 #endif
     HandleMoveWorldportAckOpcode();
 }
@@ -152,8 +152,7 @@ void WorldSession::HandleMoveWorldportAckOpcode()
             _player->SetIsSpectator(false);
 
         GetPlayer()->SetPendingSpectatorForBG(0);
-        timeWhoCommandAllowed = time(NULL) + sWorld->GetNextWhoListUpdateDelaySecs() + 1; // after exiting arena Subscribe will scan for a player and cached data says he is still in arena, so disallow until next update
-
+        
         if (uint32 inviteInstanceId = _player->GetPendingSpectatorInviteInstanceId())
         {
             if (Battleground* tbg = sBattlegroundMgr->GetBattleground(inviteInstanceId))
@@ -193,7 +192,7 @@ void WorldSession::HandleMoveWorldportAckOpcode()
             if (mapDiff->resetTime)
                 if (time_t timeReset = sInstanceSaveMgr->GetResetTimeFor(mEntry->MapID, diff))
                 {
-                    uint32 timeleft = uint32(timeReset - time(NULL));
+                    uint32 timeleft = uint32(timeReset - GameTime::GetGameTime());
                     GetPlayer()->SendInstanceResetWarning(mEntry->MapID, diff, timeleft, true);
                 }
         allowMount = mInstance->AllowMount;
@@ -226,7 +225,7 @@ void WorldSession::HandleMoveWorldportAckOpcode()
 void WorldSession::HandleMoveTeleportAck(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "MSG_MOVE_TELEPORT_ACK");
+    LOG_DEBUG("network", "MSG_MOVE_TELEPORT_ACK");
 #endif
     uint64 guid;
 
@@ -235,10 +234,10 @@ void WorldSession::HandleMoveTeleportAck(WorldPacket& recvData)
     uint32 flags, time;
     recvData >> flags >> time; // unused
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("Guid " UI64FMTD, guid);
+    LOG_DEBUG("server", "Guid " UI64FMTD, guid);
 #endif
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("Flags %u, time %u", flags, time/IN_MILLISECONDS);
+    LOG_DEBUG("server", "Flags %u, time %u", flags, time/IN_MILLISECONDS);
 #endif
 
     Player* plMover = _player->m_mover->ToPlayer();
@@ -416,7 +415,7 @@ void WorldSession::HandleMovementOpcodes(WorldPacket & recvData)
     if (mover->GetGUID() != _player->GetGUID())
         movementInfo.flags &= ~MOVEMENTFLAG_WALKING;
 
-    uint32 mstime = World::GetGameTimeMS();
+    uint32 mstime = GameTime::GetGameTimeMS();
     /*----------------------*/
     if(m_clientTimeDelay == 0)
         m_clientTimeDelay = mstime > movementInfo.time ? std::min(mstime - movementInfo.time, (uint32)100) : 0;
@@ -513,7 +512,7 @@ void WorldSession::HandleForceSpeedChangeAck(WorldPacket &recvData)
 {
     uint32 opcode = recvData.GetOpcode();
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd %s (%u, 0x%X) opcode", LookupOpcodeName(opcode), opcode, opcode);
+    LOG_DEBUG("network", "WORLD: Recvd %s (%u, 0x%X) opcode", LookupOpcodeName(opcode), opcode, opcode);
 #endif
 
     /* extract packet */
@@ -593,7 +592,7 @@ void WorldSession::HandleForceSpeedChangeAck(WorldPacket &recvData)
 void WorldSession::HandleSetActiveMoverOpcode(WorldPacket &recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd CMSG_SET_ACTIVE_MOVER");
+    LOG_DEBUG("network", "WORLD: Recvd CMSG_SET_ACTIVE_MOVER");
 #endif
 
     uint64 guid;
@@ -609,7 +608,7 @@ void WorldSession::HandleSetActiveMoverOpcode(WorldPacket &recvData)
 void WorldSession::HandleMoveNotActiveMover(WorldPacket &recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd CMSG_MOVE_NOT_ACTIVE_MOVER");
+    LOG_DEBUG("network", "WORLD: Recvd CMSG_MOVE_NOT_ACTIVE_MOVER");
 #endif
 
     uint64 old_mover_guid;
@@ -640,7 +639,7 @@ void WorldSession::HandleMountSpecialAnimOpcode(WorldPacket& /*recvData*/)
 void WorldSession::HandleMoveKnockBackAck(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "CMSG_MOVE_KNOCK_BACK_ACK");
+    LOG_DEBUG("network", "CMSG_MOVE_KNOCK_BACK_ACK");
 #endif
 
     uint64 guid;
@@ -677,7 +676,7 @@ void WorldSession::HandleMoveKnockBackAck(WorldPacket & recvData)
 void WorldSession::HandleMoveHoverAck(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "CMSG_MOVE_HOVER_ACK");
+    LOG_DEBUG("network", "CMSG_MOVE_HOVER_ACK");
 #endif
 
     uint64 guid;                                            // guid - unused
@@ -695,7 +694,7 @@ void WorldSession::HandleMoveHoverAck(WorldPacket& recvData)
 void WorldSession::HandleMoveWaterWalkAck(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "CMSG_MOVE_WATER_WALK_ACK");
+    LOG_DEBUG("network", "CMSG_MOVE_WATER_WALK_ACK");
 #endif
 
     uint64 guid;                                            // guid - unused
@@ -737,7 +736,7 @@ void WorldSession::HandleSummonResponseOpcode(WorldPacket& recvData)
 void WorldSession::HandleMoveTimeSkippedOpcode(WorldPacket& recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recvd CMSG_MOVE_TIME_SKIPPED");
+    LOG_DEBUG("network", "WORLD: Recvd CMSG_MOVE_TIME_SKIPPED");
 #endif
     
     uint64 guid;

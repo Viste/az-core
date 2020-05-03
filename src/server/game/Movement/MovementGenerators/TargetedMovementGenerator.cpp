@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -18,7 +18,8 @@
 #include "VehicleDefines.h"
 #include "Transport.h"
 #include "MapManager.h"
-
+#include "DisableMgr.h"
+#include "GameTime.h"
 #include <cmath>
 
 template<class T, typename D>
@@ -38,7 +39,7 @@ void TargetedMovementGeneratorMedium<T,D>::_setTargetLocation(T* owner, bool ini
     bool sameTransport = owner->GetTransport() && owner->GetTransport() ==  i_target->GetTransport();
     if (owner->GetMapId() == 631 && owner->GetTransport() && owner->GetTransport()->IsMotionTransport() && i_target->GetTransport() && i_target->GetTransport()->IsMotionTransport()) // for ICC, if both on a motion transport => don't use mmaps
         sameTransport = owner->GetTypeId() == TYPEID_UNIT && i_target->isInAccessiblePlaceFor(owner->ToCreature());
-    bool useMMaps = MMAP::MMapFactory::IsPathfindingEnabled(owner->FindMap()) && !sameTransport;
+    bool useMMaps = DisableMgr::IsPathfindingEnabled(owner->FindMap()) && !sameTransport;
     bool forceDest = (owner->FindMap() && owner->FindMap()->IsDungeon() && !isPlayerPet) || // force in instances to prevent exploiting
                      (owner->GetTypeId() == TYPEID_UNIT && ((owner->IsPet() && owner->HasUnitState(UNIT_STATE_FOLLOW)) || // allow pets following their master to cheat while generating paths
                      ((Creature*)owner)->isWorldBoss() || ((Creature*)owner)->IsDungeonBoss())) || // force for all bosses, even not in instances
@@ -66,7 +67,7 @@ void TargetedMovementGeneratorMedium<T,D>::_setTargetLocation(T* owner, bool ini
         if (useMMaps && !inRange && (!isPlayerPet || i_target->GetPositionZ()-z > 50.0f))
         {
             //useMMaps = false;
-            owner->m_targetsNotAcceptable[i_target->GetGUID()] = MMapTargetData(sWorld->GetGameTime()+DISALLOW_TIME_AFTER_FAIL, owner, i_target.getTarget());
+            owner->m_targetsNotAcceptable[i_target->GetGUID()] = MMapTargetData(GameTime::GetGameTime()+DISALLOW_TIME_AFTER_FAIL, owner, i_target.getTarget());
             return;
         }
 
@@ -174,7 +175,7 @@ void TargetedMovementGeneratorMedium<T,D>::_setTargetLocation(T* owner, bool ini
             }
         }
 
-        if (!forceDest && getMSTimeDiff(lastPathingFailMSTime, World::GetGameTimeMS()) < 1000)
+        if (!forceDest && getMSTimeDiff(lastPathingFailMSTime, GameTime::GetGameTimeMS()) < 1000)
         {
             lastOwnerXYZ.Relocate(-5000.0f, -5000.0f, -5000.0f);
             return;
@@ -186,8 +187,8 @@ void TargetedMovementGeneratorMedium<T,D>::_setTargetLocation(T* owner, bool ini
             float maxDist = MELEE_RANGE + owner->GetMeleeReach() + i_target->GetMeleeReach();
             if (!forceDest && (i_path->GetPathType() & PATHFIND_NOPATH || (!i_offset && !isPlayerPet && i_target->GetExactDistSq(i_path->GetActualEndPosition().x, i_path->GetActualEndPosition().y, i_path->GetActualEndPosition().z) > maxDist*maxDist)))
             {
-                lastPathingFailMSTime = World::GetGameTimeMS();
-                owner->m_targetsNotAcceptable[i_target->GetGUID()] = MMapTargetData(sWorld->GetGameTime()+DISALLOW_TIME_AFTER_FAIL, owner, i_target.getTarget());
+                lastPathingFailMSTime = GameTime::GetGameTimeMS();
+                owner->m_targetsNotAcceptable[i_target->GetGUID()] = MMapTargetData(GameTime::GetGameTime()+DISALLOW_TIME_AFTER_FAIL, owner, i_target.getTarget());
                 return;
             }
             else

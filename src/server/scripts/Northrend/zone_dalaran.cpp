@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -18,7 +18,7 @@ Script Data End */
 #include "Player.h"
 #include "WorldSession.h"
 #include "ScriptedEscortAI.h"
-#include "World.h"
+#include "GameConfig.h"
 
 // Ours
 class npc_steam_powered_auctioneer : public CreatureScript
@@ -181,7 +181,7 @@ public:
         void UpdateAI(uint32 diff) override
         {
             _events.Update(diff);
-            switch (_events.GetEvent())
+            switch (_events.ExecuteEvent())
             {
                 case EVENT_INTRO_DH1:
                     Talk(SAY_SHANDY3);
@@ -559,8 +559,7 @@ class npc_minigob_manabonk : public CreatureScript
 
             void UpdateAI(uint32 diff)
             {
-
-                if (!sWorld->getBoolConfig(CONFIG_MINIGOB_MANABONK))
+                if (!sGameConfig->GetBoolConfig("Minigob.Manabonk.Enable"))
                     return;
 
                 events.Update(diff);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -12,6 +12,7 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "GameGraveyard.h"
+#include "GameTime.h"
 
 BattlegroundSA::BattlegroundSA()
 {
@@ -1059,11 +1060,11 @@ void BattlegroundSA::UpdateDemolisherSpawns()
                     // Demolisher is not in list
                     if (DemoliserRespawnList.find(i) == DemoliserRespawnList.end())
                     {
-                        DemoliserRespawnList[i] = World::GetGameTimeMS()+30000;
+                        DemoliserRespawnList[i] = GameTime::GetGameTimeMS()+30000;
                     }
                     else
                     {
-                        if (DemoliserRespawnList[i] < World::GetGameTimeMS())
+                        if (DemoliserRespawnList[i] < GameTime::GetGameTimeMS())
                         {
                             Demolisher->Relocate(BG_SA_NpcSpawnlocs[i][0], BG_SA_NpcSpawnlocs[i][1],
                                 BG_SA_NpcSpawnlocs[i][2], BG_SA_NpcSpawnlocs[i][3]);

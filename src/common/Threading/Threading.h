@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -7,15 +7,15 @@
 #ifndef THREADING_H
 #define THREADING_H
 
+#include "Define.h"
 #include <thread>
 #include <atomic>
-
 #include <thread>
 #include <atomic>
 
 namespace acore
 {
-    class Runnable
+    class AC_COMMON_API Runnable
     {
         public:
             virtual ~Runnable() {}
@@ -42,7 +42,7 @@ namespace acore
         Priority_Realtime,
     };
 
-    class Thread
+    class AC_COMMON_API Thread
     {
         public:
             Thread();

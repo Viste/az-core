@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -13,6 +13,7 @@
 #include "Map.h"
 #include "Object.h"
 #include "MapUpdater.h"
+#include <atomic>
 
 class Transport;
 class StaticTransport;
@@ -120,6 +121,11 @@ class MapManager
 
         MapUpdater * GetMapUpdater() { return &m_updater; }
 
+        uint32 IncreaseScheduledScriptsCount() { return ++_scheduledScripts; }
+        uint32 DecreaseScheduledScriptCount() { return --_scheduledScripts; }
+        uint32 DecreaseScheduledScriptCount(size_t count) { return _scheduledScripts -= count; }
+        bool IsScriptScheduled() const { return _scheduledScripts > 0; }
+
     private:
         typedef std::unordered_map<uint32, Map*> MapMapType;
         typedef std::vector<bool> InstanceIds;
@@ -138,6 +144,9 @@ class MapManager
         InstanceIds _instanceIds;
         uint32 _nextInstanceId;
         MapUpdater m_updater;
+
+        // atomic op counter for active scripts amount
+        std::atomic<uint32> _scheduledScripts;
 };
 
 #define sMapMgr MapManager::instance()

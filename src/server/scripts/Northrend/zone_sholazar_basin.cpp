@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -28,6 +28,7 @@ EndContentData */
 #include "WaypointManager.h"
 #include "PassiveAI.h"
 #include "CombatAI.h"
+#include "GameLocale.h"
 
 // Ours
 enum songOfWindandWater
@@ -212,7 +213,7 @@ public:
             if (me->HasUnitState(UNIT_STATE_CASTING))
                 return;
 
-            switch (events.GetEvent())
+            switch (events.ExecuteEvent())
             {
                 case EVENT_ARTRUIS_HP_CHECK:
                     if (me->GetHealthPct() <= 30)
@@ -1454,10 +1455,10 @@ public:
                 switch (GetSpellInfo()->Id)
                 {
                     case SPELL_CORRECT_TRACKS:
-                        player->MonsterSay(sObjectMgr->GetAcoreStringForDBCLocale(SAY_CORRECT_TRACKS), LANG_UNIVERSAL, player);
+                        player->MonsterSay(sGameLocale->GetAcoreStringForDBCLocale(SAY_CORRECT_TRACKS), LANG_UNIVERSAL, player);
                         break;
                     case SPELL_INCORRECT_TRACKS:
-                        player->MonsterSay(sObjectMgr->GetAcoreStringForDBCLocale(SAY_INCORRECT_TRACKS), LANG_UNIVERSAL, player);
+                        player->MonsterSay(sGameLocale->GetAcoreStringForDBCLocale(SAY_INCORRECT_TRACKS), LANG_UNIVERSAL, player);
                         break;
                     default:
                         break;

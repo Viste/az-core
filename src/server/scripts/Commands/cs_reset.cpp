@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -18,6 +18,7 @@ EndScriptData */
 #include "Player.h"
 #include "Pet.h"
 #include "ScriptMgr.h"
+#include "GameConfig.h"
 
 class reset_commandscript : public CommandScript
 {
@@ -119,8 +120,8 @@ public:
 
         // set starting level
         uint32 startLevel = target->getClass() != CLASS_DEATH_KNIGHT
-            ? sWorld->getIntConfig(CONFIG_START_PLAYER_LEVEL)
-            : sWorld->getIntConfig(CONFIG_START_HEROIC_PLAYER_LEVEL);
+            ? sGameConfig->GetIntConfig("StartPlayerLevel")
+            : sGameConfig->GetIntConfig("StartHeroicPlayerLevel");
 
         target->_ApplyAllLevelScaleItemMods(false);
         target->SetLevel(startLevel);

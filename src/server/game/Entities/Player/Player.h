@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -11,7 +11,6 @@
 #include "GroupReference.h"
 #include "MapReference.h"
 #include "InstanceSaveMgr.h"
-
 #include "Item.h"
 #include "PetDefines.h"
 #include "QuestDef.h"
@@ -20,7 +19,6 @@
 #include "Battleground.h"
 #include "WorldSession.h"
 #include "ObjectMgr.h"
-
 #include <string>
 #include <vector>
 
@@ -102,6 +100,40 @@ struct PlayerTalent
     uint32 talentID;
     bool inSpellBook;
     bool IsInSpec(uint8 spec) { return (specMask & (1<<spec)); }
+};
+
+enum TalentTree // talent tabs
+{
+    TALENT_TREE_WARRIOR_ARMS = 161,
+    TALENT_TREE_WARRIOR_FURY = 164,
+    TALENT_TREE_WARRIOR_PROTECTION = 163,
+    TALENT_TREE_PALADIN_HOLY = 382,
+    TALENT_TREE_PALADIN_PROTECTION = 383,
+    TALENT_TREE_PALADIN_RETRIBUTION = 381,
+    TALENT_TREE_HUNTER_BEAST_MASTERY = 361,
+    TALENT_TREE_HUNTER_MARKSMANSHIP = 363,
+    TALENT_TREE_HUNTER_SURVIVAL = 362,
+    TALENT_TREE_ROGUE_ASSASSINATION = 182,
+    TALENT_TREE_ROGUE_COMBAT = 181,
+    TALENT_TREE_ROGUE_SUBTLETY = 183,
+    TALENT_TREE_PRIEST_DISCIPLINE = 201,
+    TALENT_TREE_PRIEST_HOLY = 202,
+    TALENT_TREE_PRIEST_SHADOW = 203,
+    TALENT_TREE_DEATH_KNIGHT_BLOOD = 398,
+    TALENT_TREE_DEATH_KNIGHT_FROST = 399,
+    TALENT_TREE_DEATH_KNIGHT_UNHOLY = 400,
+    TALENT_TREE_SHAMAN_ELEMENTAL = 261,
+    TALENT_TREE_SHAMAN_ENHANCEMENT = 263,
+    TALENT_TREE_SHAMAN_RESTORATION = 262,
+    TALENT_TREE_MAGE_ARCANE = 81,
+    TALENT_TREE_MAGE_FIRE = 41,
+    TALENT_TREE_MAGE_FROST = 61,
+    TALENT_TREE_WARLOCK_AFFLICTION = 302,
+    TALENT_TREE_WARLOCK_DEMONOLOGY = 303,
+    TALENT_TREE_WARLOCK_DESTRUCTION = 301,
+    TALENT_TREE_DRUID_BALANCE = 283,
+    TALENT_TREE_DRUID_FERAL_COMBAT = 281,
+    TALENT_TREE_DRUID_RESTORATION = 282
 };
 
 #define SPEC_MASK_ALL 255
@@ -1125,16 +1157,8 @@ class Player : public Unit, public GridObject<Player>
         }
         bool TeleportToEntryPoint();
 
-        void SetSummonPoint(uint32 mapid, float x, float y, float z, uint32 delay = 0, bool asSpectator = false)
-        {
-            m_summon_expire = time(NULL) + (delay ? delay : MAX_PLAYER_SUMMON_DELAY);
-            m_summon_mapid = mapid;
-            m_summon_x = x;
-            m_summon_y = y;
-            m_summon_z = z;
-            m_summon_asSpectator = asSpectator;
-        }
-        bool IsSummonAsSpectator() const { return m_summon_asSpectator && m_summon_expire >= time(NULL); }
+        void SetSummonPoint(uint32 mapid, float x, float y, float z, uint32 delay = 0, bool asSpectator = false);
+        bool IsSummonAsSpectator() const;
         void SetSummonAsSpectator(bool on) { m_summon_asSpectator = on; }
         void SummonIfPossible(bool agree, uint32 summoner_guid);
         time_t GetSummonExpireTimer() const { return m_summon_expire; }
@@ -1729,8 +1753,11 @@ class Player : public Unit, public GridObject<Player>
         void ActivateSpec(uint8 spec);
         void GetTalentTreePoints(uint8 (&specPoints)[3]) const;
         uint8 GetMostPointsTalentTree() const;
-        bool IsHealerTalentSpec() const;
-        bool IsTankTalentSpec() const;
+        bool HasTankSpec();
+        bool HasMeleeSpec();
+        bool HasCasterSpec();
+        bool HasHealSpec();
+        uint32 GetSpec(int8 spec = -1);
 
         void InitGlyphsForLevel();
         void SetGlyphSlot(uint8 slot, uint32 slottype) { SetUInt32Value(PLAYER_FIELD_GLYPH_SLOTS_1 + slot, slottype); }
@@ -1767,21 +1794,9 @@ class Player : public Unit, public GridObject<Player>
 
         static uint32 const infinityCooldownDelay = 0x9A7EC800;  // used for set "infinity cooldowns" for spells and check, MONTH*IN_MILLISECONDS
         static uint32 const infinityCooldownDelayCheck = 0x4D3F6400; //MONTH*IN_MILLISECONDS/2;
-        virtual bool HasSpellCooldown(uint32 spell_id) const override
-        {
-            SpellCooldowns::const_iterator itr = m_spellCooldowns.find(spell_id);
-            return itr != m_spellCooldowns.end() && itr->second.end > World::GetGameTimeMS();
-        }
-        virtual bool HasSpellItemCooldown(uint32 spell_id, uint32 itemid) const override
-        {
-            SpellCooldowns::const_iterator itr = m_spellCooldowns.find(spell_id);
-            return itr != m_spellCooldowns.end() && itr->second.end > World::GetGameTimeMS() && itr->second.itemid == itemid;
-        }
-        uint32 GetSpellCooldownDelay(uint32 spell_id) const
-        {
-            SpellCooldowns::const_iterator itr = m_spellCooldowns.find(spell_id);
-            return uint32(itr != m_spellCooldowns.end() && itr->second.end > World::GetGameTimeMS() ? itr->second.end - World::GetGameTimeMS() : 0);
-        }
+        virtual bool HasSpellCooldown(uint32 spell_id) const;
+        virtual bool HasSpellItemCooldown(uint32 spell_id, uint32 itemid) const;
+        uint32 GetSpellCooldownDelay(uint32 spell_id) const;
         void AddSpellAndCategoryCooldowns(SpellInfo const* spellInfo, uint32 itemId, Spell* spell = NULL, bool infinityCooldown = false);
         void AddSpellCooldown(uint32 spell_id, uint32 itemid, uint32 end_time, bool needSendToClient = false, bool forceSendToSpectator = false) override;
         void ModifySpellCooldown(uint32 spellId, int32 cooldown);
@@ -2568,7 +2583,7 @@ class Player : public Unit, public GridObject<Player>
                 CreatureModelDataEntry const* modelData = sCreatureModelDataStore.LookupEntry(displayInfo->ModelId);
                 ASSERT(modelData);
 
-                float scaleMod = GetFloatValue(OBJECT_FIELD_SCALE_X); // 99% sure about this
+                float scaleMod = GetObjectScale(); // 99% sure about this
 
                 return scaleMod * mountModelData->MountHeight + modelData->CollisionHeight * 0.5f;
             }
@@ -2986,7 +3001,7 @@ void RemoveItemsSetItem(Player* player, ItemTemplate const* proto);
 
 // "the bodies of template functions must be made available in a header file"
 template <class T> T Player::ApplySpellMod(uint32 spellId, SpellModOp op, T &basevalue, Spell* spell, bool temporaryPet)
-{ 
+{
     SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(spellId);
     if (!spellInfo)
         return 0;

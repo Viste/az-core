@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -33,9 +33,12 @@
 #include "Transport.h"
 #include "ScriptMgr.h"
 #include "GameGraveyard.h"
+#include "GameLocale.h"
+
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
+
 namespace acore
 {
     class BattlegroundChatBuilder
@@ -46,7 +49,7 @@ namespace acore
 
             void operator()(WorldPacket& data, LocaleConstant loc_idx)
             {
-                char const* text = sObjectMgr->GetAcoreString(_textId, loc_idx);
+                char const* text = sGameLocale->GetAcoreString(_textId, loc_idx);
                 if (_args)
                 {
                     // we need copy va_list before use or original va_list will corrupted
@@ -83,9 +86,9 @@ namespace acore
 
             void operator()(WorldPacket& data, LocaleConstant loc_idx)
             {
-                char const* text = sObjectMgr->GetAcoreString(_textId, loc_idx);
-                char const* arg1str = _arg1 ? sObjectMgr->GetAcoreString(_arg1, loc_idx) : "";
-                char const* arg2str = _arg2 ? sObjectMgr->GetAcoreString(_arg2, loc_idx) : "";
+                char const* text = sGameLocale->GetAcoreString(_textId, loc_idx);
+                char const* arg1str = _arg1 ? sGameLocale->GetAcoreString(_arg1, loc_idx) : "";
+                char const* arg2str = _arg2 ? sGameLocale->GetAcoreString(_arg2, loc_idx) : "";
 
                 char str[2048];
                 snprintf(str, 2048, text, arg1str, arg2str);
@@ -308,7 +311,7 @@ inline void Battleground::_CheckSafePositions(uint32 diff)
             if (pos.GetExactDistSq(x, y, z) > maxDist)
             {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_BATTLEGROUND, "BATTLEGROUND: Sending %s back to start location (map: %u) (possible exploit)", itr->second->GetName().c_str(), GetMapId());
+                LOG_DEBUG("bg", "BATTLEGROUND: Sending %s back to start location (map: %u) (possible exploit)", itr->second->GetName().c_str(), GetMapId());
 #endif
                 itr->second->TeleportTo(GetMapId(), x, y, z, o);
             }
@@ -584,7 +587,7 @@ inline void Battleground::_ProcessJoin(uint32 diff)
             }
 
             // Announce BG starting
-            if (sWorld->getBoolConfig(CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_ENABLE))
+            if (sGameConfig->GetBoolConfig("QueueAnnouncer.Enable"))
                 sWorld->SendWorldText(LANG_BG_STARTED_ANNOUNCE_WORLD, GetName(), std::min(GetMinLevel(), (uint32)80), std::min(GetMaxLevel(), (uint32)80));
 
             sScriptMgr->OnBattlegroundStart(this);
@@ -772,7 +775,7 @@ void Battleground::EndBattleground(TeamId winnerTeamId)
 
     PreparedStatement* stmt = NULL;
     uint64 battlegroundId = 1;
-    if (isBattleground() && sWorld->getBoolConfig(CONFIG_BATTLEGROUND_STORE_STATISTICS_ENABLE))
+    if (isBattleground() && sGameConfig->GetBoolConfig("Battleground.StoreStatistics.Enable"))
     {
         stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_PVPSTATS_MAXID);
         PreparedQueryResult result = CharacterDatabase.Query(stmt);
@@ -1013,7 +1016,7 @@ void Battleground::EndBattleground(TeamId winnerTeamId)
 
         player->GetSession()->SendPacket(&pvpLogData);
 
-        if (isBattleground() && sWorld->getBoolConfig(CONFIG_BATTLEGROUND_STORE_STATISTICS_ENABLE))
+        if (isBattleground() && sGameConfig->GetBoolConfig("Battleground.StoreStatistics.Enable"))
         {
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_PVPSTATS_PLAYER);
             BattlegroundScoreMap::const_iterator score = PlayerScores.find(player->GetGUID());
@@ -1140,7 +1143,7 @@ void Battleground::RemovePlayerAtLeave(Player* player)
         SendPacketToTeam(teamId, &data, player, false);
 
         // cast deserter
-        if (isBattleground() && !player->IsGameMaster() && sWorld->getBoolConfig(CONFIG_BATTLEGROUND_CAST_DESERTER))
+        if (isBattleground() && !player->IsGameMaster() && sGameConfig->GetBoolConfig("Battleground.CastDeserter"))
             if (GetStatus() == STATUS_IN_PROGRESS || GetStatus() == STATUS_WAIT_JOIN)
                 player->ScheduleDelayedOperation(DELAYED_SPELL_CAST_DESERTER);
     }
@@ -1310,11 +1313,11 @@ void Battleground::AddOrSetPlayerToCorrectBgGroup(Player* player, TeamId teamId)
 
 uint32 Battleground::GetFreeSlotsForTeam(TeamId teamId) const
 {
-    // if BG is starting and CONFIG_BATTLEGROUND_INVITATION_TYPE == BG_QUEUE_INVITATION_TYPE_NO_BALANCE, invite anyone
-    if (GetStatus() == STATUS_WAIT_JOIN && sWorld->getIntConfig(CONFIG_BATTLEGROUND_INVITATION_TYPE) == BG_QUEUE_INVITATION_TYPE_NO_BALANCE)
+    // if BG is starting and "Battleground.InvitationType" == BG_QUEUE_INVITATION_TYPE_NO_BALANCE, invite anyone
+    if (GetStatus() == STATUS_WAIT_JOIN && sGameConfig->GetIntConfig("Battleground.InvitationType") == BG_QUEUE_INVITATION_TYPE_NO_BALANCE)
         return (GetInvitedCount(teamId) < GetMaxPlayersPerTeam()) ? GetMaxPlayersPerTeam() - GetInvitedCount(teamId) : 0;
 
-    // if BG is already started or CONFIG_BATTLEGROUND_INVITATION_TYPE != BG_QUEUE_INVITATION_TYPE_NO_BALANCE, do not allow to join too many players of one faction
+    // if BG is already started or "Battleground.InvitationType" != BG_QUEUE_INVITATION_TYPE_NO_BALANCE, do not allow to join too many players of one faction
     uint32 thisTeamInvitedCount = teamId == TEAM_ALLIANCE ? GetInvitedCount(TEAM_ALLIANCE) : GetInvitedCount(TEAM_HORDE);
     uint32 thisTeamPlayersCount = teamId == TEAM_ALLIANCE ? GetPlayersCountByTeam(TEAM_ALLIANCE) : GetPlayersCountByTeam(TEAM_HORDE);
     uint32 otherTeamInvitedCount = teamId == TEAM_ALLIANCE ? GetInvitedCount(TEAM_HORDE) : GetInvitedCount(TEAM_ALLIANCE);
@@ -1777,7 +1780,7 @@ void Battleground::SendWarningToAll(uint32 entry, ...)
     {
         if (localizedPackets.find(itr->second->GetSession()->GetSessionDbLocaleIndex()) == localizedPackets.end())
         {
-            char const* format = sObjectMgr->GetAcoreString(entry, itr->second->GetSession()->GetSessionDbLocaleIndex());
+            char const* format = sGameLocale->GetAcoreString(entry, itr->second->GetSession()->GetSessionDbLocaleIndex());
 
             char str[1024];
             va_list ap;
@@ -1809,7 +1812,7 @@ void Battleground::EndNow()
 char const* Battleground::GetAcoreString(int32 entry)
 {
     // FIXME: now we have different DBC locales and need localized message for each target client
-    return sObjectMgr->GetAcoreStringForDBCLocale(entry);
+    return sGameLocale->GetAcoreStringForDBCLocale(entry);
 }
 
 void Battleground::HandleTriggerBuff(GameObject* gameObject)
@@ -1986,7 +1989,7 @@ uint32 Battleground::GetTeamScore(TeamId teamId) const
 
 void Battleground::RewardXPAtKill(Player* killer, Player* victim)
 {
-    if (sWorld->getBoolConfig(CONFIG_BG_XP_FOR_KILL) && killer && victim)
+    if (sGameConfig->GetBoolConfig("Battleground.GiveXPForKills") && killer && victim)
         killer->RewardPlayerAndGroupAtKill(victim, true);
 }
 

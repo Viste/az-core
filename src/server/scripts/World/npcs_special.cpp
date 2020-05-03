@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -49,6 +49,7 @@ EndContentData */
 #include "WaypointManager.h"
 #include "SmartAI.h"
 #include "DBCStructure.h"
+#include "GameTime.h"
 
 enum elderClearwater
 {
@@ -104,11 +105,11 @@ public:
         void UpdateAI(uint32 diff) override
         {
             events.Update(diff);
-            switch (events.GetEvent())
+            switch (events.ExecuteEvent())
             {
                 case EVENT_CLEARWATER_ANNOUNCE:
                 {
-                    time_t curtime = time(NULL);
+                    time_t curtime = GameTime::GetGameTime();
                     tm strdate;
                     ACE_OS::localtime_r(&curtime, &strdate);
 
@@ -249,11 +250,11 @@ public:
         void UpdateAI(uint32 diff) override
         {
             events.Update(diff);
-            switch (events.GetEvent())
+            switch (events.ExecuteEvent())
             {
                 case EVENT_RIGGLE_ANNOUNCE:
                 {
-                    time_t curtime = time(NULL);
+                    time_t curtime = GameTime::GetGameTime();
                     tm strdate;
                     ACE_OS::localtime_r(&curtime, &strdate);
                     if (!startWarning && strdate.tm_hour == 14 && strdate.tm_min == 0)

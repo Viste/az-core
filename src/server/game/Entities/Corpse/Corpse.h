@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -54,7 +54,7 @@ class Corpse : public WorldObject, public GridObject<Corpse>
         uint64 GetOwnerGUID() const { return GetUInt64Value(CORPSE_FIELD_OWNER); }
 
         time_t const& GetGhostTime() const { return m_time; }
-        void ResetGhostTime() { m_time = time(NULL); }
+        void ResetGhostTime();
         CorpseType GetType() const { return m_type; }
 
         GridCoord const& GetGridCoord() const { return _gridCoord; }

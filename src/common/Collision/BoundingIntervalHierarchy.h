@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -52,7 +52,7 @@ struct AABound
     Copyright (c) 2003-2007 Christopher Kulla
 */
 
-class BIH
+class AC_COMMON_API BIH
 {
     private:
         void init_empty()
@@ -341,7 +341,7 @@ class BIH
             float tfar;
         };
 
-        class BuildStats
+        class AC_COMMON_API BuildStats
         {
             private:
                 int numNodes;

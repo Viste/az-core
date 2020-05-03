@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -31,7 +31,7 @@
 #include "SpellAuraEffects.h"
 #include "Chat.h"
 #include "Vehicle.h"
-
+#include "GameTime.h"
 
 // Ours
 class spell_gen_model_visible : public SpellScriptLoader
@@ -1169,7 +1169,7 @@ class spell_gen_mod_radius_by_caster_scale : public SpellScriptLoader
 
             bool Load()
             {
-                GetSpell()->SetSpellValue(SPELLVALUE_RADIUS_MOD, 10000.0f * GetCaster()->GetFloatValue(OBJECT_FIELD_SCALE_X));
+                GetSpell()->SetSpellValue(SPELLVALUE_RADIUS_MOD, 10000.0f * GetCaster()->GetObjectScale());
                 return true;
             }
 
@@ -2736,12 +2736,12 @@ class spell_gen_turkey_marker : public SpellScriptLoader
             {
                 if (GetStackAmount() > stackAmount)
                 {
-                    _applyTimes.push_back(World::GetGameTimeMS());
+                    _applyTimes.push_back(GameTime::GetGameTimeMS());
                     stackAmount++;
                 }
 
                 // pop stack if it expired for us
-                if (_applyTimes.front() + GetMaxDuration() < World::GetGameTimeMS())
+                if (_applyTimes.front() + GetMaxDuration() < GameTime::GetGameTimeMS())
                 {
                     stackAmount--;
                     ModStackAmount(-1, AURA_REMOVE_BY_EXPIRE);

@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU AGPL3 v3 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-AGPL3
+# Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
 #
 # This file is free software; as a special exception the author gives
 # unlimited permission to copy and/or distribute it, with or without
@@ -14,6 +14,7 @@ CollectSourceFiles(
   PRIVATE_SOURCES
   # Exclude
   ${CMAKE_CURRENT_SOURCE_DIR}/Debugging
+  ${CMAKE_CURRENT_SOURCE_DIR}/Platform
   ${CMAKE_CURRENT_SOURCE_DIR}/PrecompiledHeaders)
 
 # Manually set sources for Debugging directory as we don't want to include WheatyExceptionReport in common project
@@ -29,6 +30,8 @@ endif()
 
 # Group sources
 GroupSources(${CMAKE_CURRENT_SOURCE_DIR})
+
+add_definitions(-DACORE_API_EXPORT_COMMON)
 
 add_library(common
   ${PRIVATE_SOURCES})
@@ -49,10 +52,12 @@ target_include_directories(common
 
 target_link_libraries(common
   PRIVATE
-    game-interface
-  PUBLIC
+    process
     acore-core-interface
+  PUBLIC
     ace
+    boost
+    Poco::Foundation
     mysql
     g3dlib
     Detour
@@ -67,6 +72,18 @@ set_target_properties(common
   PROPERTIES
     FOLDER
       "server")
+
+if( BUILD_SHARED_LIBS )
+  if( UNIX )
+    install(TARGETS common
+      LIBRARY
+        DESTINATION lib)
+  elseif( WIN32 )
+    install(TARGETS common
+      RUNTIME
+        DESTINATION "${CMAKE_INSTALL_PREFIX}")
+  endif()
+endif()
 
 # Generate precompiled header
 if (USE_COREPCH)

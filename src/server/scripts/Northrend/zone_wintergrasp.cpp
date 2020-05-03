@@ -1,4 +1,4 @@
-/* Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2 This program is free software; you can redistribute it and/or modify
+/* Copyright (C) 2016+     AzerothCore <www.azerothcore.org> This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
@@ -29,7 +29,9 @@
 #include "Player.h"
 #include "PoolMgr.h"
 #include "GameGraveyard.h"
-#include "World.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
 
 #define GOSSIP_HELLO_DEMO1  "Build catapult."
 #define GOSSIP_HELLO_DEMO2  "Build demolisher."
@@ -212,7 +214,7 @@ class npc_wg_spirit_guide : public CreatureScript
             GraveyardVect graveyard = wintergrasp->GetGraveyardVector();
             for (uint8 i = 0; i < graveyard.size(); i++)
                 if (graveyard[i]->GetControlTeamId() == player->GetTeamId())
-                    AddGossipItemFor(player, GOSSIP_ICON_CHAT, sObjectMgr->GetAcoreStringForDBCLocale(((BfGraveyardWG*)graveyard[i])->GetTextId()), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + i);
+                    AddGossipItemFor(player, GOSSIP_ICON_CHAT, sGameLocale->GetAcoreStringForDBCLocale(((BfGraveyardWG*)graveyard[i])->GetTextId()), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF + i);
 
             SendGossipMenuFor(player, player->GetGossipTextId(creature), creature->GetGUID());
             return true;
@@ -276,7 +278,7 @@ class npc_wg_queue : public CreatureScript
 
         bool OnGossipHello(Player* player, Creature* creature) override
         {
-            if (!sWorld->getBoolConfig(CONFIG_MINIGOB_MANABONK))
+            if (!sGameConfig->GetBoolConfig("Minigob.Manabonk.Enable"))
                 return false;
 
             if (creature->IsQuestGiver())
@@ -294,7 +296,7 @@ class npc_wg_queue : public CreatureScript
             else
             {
                 uint32 timer = wintergrasp->GetTimer() / 1000;
-                player->SendUpdateWorldState(4354, time(NULL) + timer);
+                player->SendUpdateWorldState(4354, GameTime::GetGameTime() + timer);
                 if (timer < 15 * MINUTE)
                 {
                     AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Queue for Wintergrasp.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_INFO_DEF);
@@ -341,7 +343,7 @@ class npc_wg_queue : public CreatureScript
 
             void UpdateAI(uint32 diff) override
             {
-                if (CONFIG_WINTERGRASP_ENABLE == false)
+                if (!sGameConfig->GetBoolConfig("Wintergrasp.Enable"))
                     return;
 
                 ScriptedAI::UpdateAI(diff);
@@ -661,7 +663,7 @@ class npc_wg_quest_giver : public CreatureScript
                         {
                             if (quest->IsAutoComplete())
                                 result2 = DIALOG_STATUS_REWARD_REP;
-                            else if (player->getLevel() <= (player->GetQuestLevel(quest) + sWorld->getIntConfig(CONFIG_QUEST_LOW_LEVEL_HIDE_DIFF)))
+                            else if (player->getLevel() <= (player->GetQuestLevel(quest) + sGameConfig->GetIntConfig("Quests.LowLevelHideDiff")))
                             {
                                 if (quest->IsDaily())
                                     result2 = DIALOG_STATUS_AVAILABLE_REP;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -40,6 +40,8 @@ MapDifficulty const* GetMapDifficultyData(uint32 mapId, Difficulty difficulty);
 MapDifficulty const* GetDownscaledMapDifficultyData(uint32 mapId, Difficulty &difficulty);
 
 bool IsSharedDifficultyMap(uint32 mapid);
+
+uint32 const* /*[MAX_TALENT_TABS]*/ GetTalentTabPages(uint8 cls);
 
 uint32 GetLiquidFlags(uint32 liquidType);
 

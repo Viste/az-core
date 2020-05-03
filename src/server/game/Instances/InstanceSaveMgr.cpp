@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -22,6 +22,8 @@
 #include "Group.h"
 #include "InstanceScript.h"
 #include "ScriptMgr.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 uint16 InstanceSaveManager::ResetTimeDelay[] = {3600, 900, 300, 60, 0};
 PlayerBindStorage InstanceSaveManager::playerBindStorage;
@@ -83,7 +85,7 @@ InstanceSave* InstanceSaveManager::AddInstanceSave(uint32 mapId, uint32 instance
     }
     else
     {
-        resetTime = time(NULL) + 3*DAY; // normals expire after 3 days even if someone is still bound to them, cleared on startup
+        resetTime = GameTime::GetGameTime() + 3*DAY; // normals expire after 3 days even if someone is still bound to them, cleared on startup
         extendedResetTime = 0;
     }
     InstanceSave* save = new InstanceSave(mapId, instanceId, difficulty, resetTime, extendedResetTime);
@@ -245,11 +247,11 @@ void InstanceSaveManager::LoadInstances()
 
 void InstanceSaveManager::LoadResetTimes()
 {
-    time_t now = time(NULL);
+    time_t now = GameTime::GetGameTime();
     time_t today = (now / DAY) * DAY;
 
     // load the global respawn times for raid/heroic instances
-    uint32 diff = sWorld->getIntConfig(CONFIG_INSTANCE_RESET_TIME_HOUR) * HOUR;
+    uint32 diff = sGameConfig->GetIntConfig("Instance.ResetTimeHour") * HOUR;
     QueryResult result = CharacterDatabase.Query("SELECT mapid, difficulty, resettime FROM instance_reset");
     if (result)
     {
@@ -284,7 +286,7 @@ void InstanceSaveManager::LoadResetTimes()
             continue;
 
         // the reset_delay must be at least one day
-        uint32 period = uint32(((mapDiff->resetTime * sWorld->getRate(RATE_INSTANCE_RESET_TIME))/DAY) * DAY);
+        uint32 period = uint32(((mapDiff->resetTime * sGameConfig->GetFloatConfig("Rate.InstanceResetTime"))/DAY) * DAY);
         if (period < DAY)
             period = DAY;
 
@@ -410,7 +412,7 @@ void InstanceSaveManager::ScheduleReset(time_t time, InstResetEvent event)
 
 void InstanceSaveManager::Update()
 {
-    time_t now = time(NULL);
+    time_t now = GameTime::GetGameTime();
     time_t t;
     bool resetOccurred = false;
 
@@ -509,7 +511,7 @@ void InstanceSaveManager::_ResetOrWarnAll(uint32 mapid, Difficulty difficulty, b
     if (!mapEntry->Instanceable())
         return;
 
-    time_t now = time(NULL);
+    time_t now = GameTime::GetGameTime();
 
     if (!warn)
     {
@@ -521,9 +523,9 @@ void InstanceSaveManager::_ResetOrWarnAll(uint32 mapid, Difficulty difficulty, b
         }
 
         // calculate the next reset time
-        uint32 diff = sWorld->getIntConfig(CONFIG_INSTANCE_RESET_TIME_HOUR) * HOUR;
+        uint32 diff = sGameConfig->GetIntConfig("Instance.ResetTimeHour") * HOUR;
 
-        uint32 period = uint32(((mapDiff->resetTime * sWorld->getRate(RATE_INSTANCE_RESET_TIME))/DAY) * DAY);
+        uint32 period = uint32(((mapDiff->resetTime * sGameConfig->GetFloatConfig("Rate.InstanceResetTime"))/DAY) * DAY);
         if (period < DAY)
             period = DAY;
 

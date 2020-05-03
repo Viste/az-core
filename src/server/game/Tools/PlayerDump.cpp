@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -11,8 +11,10 @@
 #include "ObjectMgr.h"
 #include "AccountMgr.h"
 #include "World.h"
+#include "GameConfig.h"
 
 #define DUMP_TABLE_COUNT 27
+
 struct DumpTable
 {
     char const* name;
@@ -347,10 +349,10 @@ bool PlayerDumpWriter::GetDump(uint32 guid, std::string &dump)
 
 DumpReturn PlayerDumpWriter::WriteDump(const std::string& file, uint32 guid)
 {
-    if (sWorld->getBoolConfig(CONFIG_PDUMP_NO_PATHS))
+    if (sGameConfig->GetBoolConfig("PlayerDump.DisallowPaths"))
         if (strstr(file.c_str(), "\\") || strstr(file.c_str(), "/"))
             return DUMP_FILE_OPEN_ERROR;
-    if (sWorld->getBoolConfig(CONFIG_PDUMP_NO_OVERWRITE))
+    if (sGameConfig->GetBoolConfig("PlayerDump.DisallowOverwrite"))
         if (FILE* f = fopen(file.c_str(), "r"))
         {
             fclose(f);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -19,6 +19,8 @@ EndScriptData */
 #include "Player.h"
 #include "ScriptMgr.h"
 #include "BanManager.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 /// Ban function modes
 enum BanMode
@@ -112,12 +114,12 @@ public:
         case BAN_SUCCESS:
             if (atoi(durationStr) > 0)
             {
-                if (!sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD))
+                if (!sGameConfig->GetBoolConfig("ShowBanInWorld"))
                     handler->PSendSysMessage(LANG_BAN_YOUBANNED, name.c_str(), secsToTimeString(TimeStringToSecs(durationStr), true).c_str(), reasonStr);
             }
             else
             {
-                if (!sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD))
+                if (!sGameConfig->GetBoolConfig("ShowBanInWorld"))
                     handler->PSendSysMessage(LANG_BAN_YOUPERMBANNED, name.c_str(), reasonStr);
             }
             break;
@@ -207,12 +209,12 @@ public:
             case BAN_SUCCESS:
                 if (atoi(durationStr) > 0)
                 {
-                    if (!sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD)) 
+                    if (!sGameConfig->GetBoolConfig("ShowBanInWorld")) 
                         handler->PSendSysMessage(LANG_BAN_YOUBANNED, nameOrIP.c_str(), secsToTimeString(TimeStringToSecs(durationStr), true).c_str(), reasonStr);
                 }
                 else
                 {
-                    if (!sWorld->getBoolConfig(CONFIG_SHOW_BAN_IN_WORLD))
+                    if (!sGameConfig->GetBoolConfig("ShowBanInWorld"))
                         handler->PSendSysMessage(LANG_BAN_YOUPERMBANNED, nameOrIP.c_str(), reasonStr);
                 }
                 break;
@@ -286,7 +288,7 @@ public:
 
             time_t unbanDate = time_t(fields[3].GetUInt32());
             bool active = false;
-            if (fields[2].GetBool() && (fields[1].GetUInt64() == uint64(0) || unbanDate >= time(nullptr)))
+            if (fields[2].GetBool() && (fields[1].GetUInt64() == uint64(0) || unbanDate >= GameTime::GetGameTime()))
                 active = true;
             bool permanent = (fields[1].GetUInt64() == uint64(0));
             std::string banTime = permanent ? handler->GetAcoreString(LANG_BANINFO_INFINITE) : secsToTimeString(fields[1].GetUInt64(), true);
@@ -334,7 +336,7 @@ public:
             Field* fields = result->Fetch();
             time_t unbanDate = time_t(fields[3].GetUInt32());
             bool active = false;
-            if (fields[2].GetUInt8() && (!fields[1].GetUInt32() || unbanDate >= time(nullptr)))
+            if (fields[2].GetUInt8() && (!fields[1].GetUInt32() || unbanDate >= GameTime::GetGameTime()))
                 active = true;
             bool permanent = (fields[1].GetUInt32() == uint32(0));
             std::string banTime = permanent ? handler->GetAcoreString(LANG_BANINFO_INFINITE) : secsToTimeString(fields[1].GetUInt64(), true);

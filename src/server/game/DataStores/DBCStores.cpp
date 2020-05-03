@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -12,8 +12,7 @@
 #include "TransportMgr.h"
 #include "DBCfmt.h"
 #include "BattlegroundMgr.h"
-#include "World.h"
-
+#include "GameConfig.h"
 #include <map>
 
 typedef std::map<uint16, uint32> AreaFlagByAreaID;
@@ -158,6 +157,9 @@ DBCStorage <SummonPropertiesEntry> sSummonPropertiesStore(SummonPropertiesfmt);
 DBCStorage <TalentEntry> sTalentStore(TalentEntryfmt);
 TalentSpellPosMap sTalentSpellPosMap;
 DBCStorage <TalentTabEntry> sTalentTabStore(TalentTabEntryfmt);
+
+// store absolute bit position for first rank for talent inspect
+static uint32 sTalentTabPages[MAX_CLASSES][3];
 
 DBCStorage <TaxiNodesEntry> sTaxiNodesStore(TaxiNodesEntryfmt);
 TaxiMask sTaxiNodesMask;
@@ -468,6 +470,26 @@ void LoadDBCStores(const std::string& dataPath)
     }
 
     LoadDBC(availableDbcLocales, bad_dbc_files, sTalentTabStore,              dbcPath, "TalentTab.dbc");
+
+    // prepare fast data access to bit pos of talent ranks for use at inspecting
+    {
+        // now have all max ranks (and then bit amount used for store talent ranks in inspect)
+        for (uint32 talentTabId = 1; talentTabId < sTalentTabStore.GetNumRows(); ++talentTabId)
+        {
+            TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentTabId);
+            if (!talentTabInfo)
+                continue;
+
+            // prevent memory corruption; otherwise cls will become 12 below
+            if ((talentTabInfo->ClassMask & CLASSMASK_ALL_PLAYABLE) == 0)
+                continue;
+
+            // store class talent tab pages
+            for (uint32 cls = 1; cls < MAX_CLASSES; ++cls)
+                if (talentTabInfo->ClassMask & (1 << (cls - 1)))
+                    sTalentTabPages[cls][talentTabInfo->tabpage] = talentTabId;
+        }
+    }
 
     LoadDBC(availableDbcLocales, bad_dbc_files, sTaxiNodesStore,              dbcPath, "TaxiNodes.dbc");
     LoadDBC(availableDbcLocales, bad_dbc_files, sTaxiPathStore,               dbcPath, "TaxiPath.dbc");
@@ -784,9 +806,14 @@ PvPDifficultyEntry const* GetBattlegroundBracketById(uint32 mapid, BattlegroundB
     return NULL;
 }
 
+uint32 const* GetTalentTabPages(uint8 cls)
+{
+    return sTalentTabPages[cls];
+}
+
 bool IsSharedDifficultyMap(uint32 mapid)
 { 
-    return sWorld->getBoolConfig(CONFIG_INSTANCE_SHARED_ID) && (mapid == 631 || mapid == 724); 
+    return sGameConfig->GetBoolConfig("Instance.SharedNormalHeroicId") && (mapid == 631 || mapid == 724); 
 }
 
 uint32 GetLiquidFlags(uint32 liquidType)

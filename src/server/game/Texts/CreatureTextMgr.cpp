@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -13,6 +13,8 @@
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "CreatureTextMgr.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
 
 class CreatureTextBuilder
 {
@@ -133,7 +135,7 @@ void CreatureTextMgr::LoadCreatureTexts()
         }
         if (temp.BroadcastTextId)
         {
-            if (!sObjectMgr->GetBroadcastText(temp.BroadcastTextId))
+            if (!sGameLocale->GetBroadcastText(temp.BroadcastTextId))
             {
                 sLog->outErrorDb("CreatureTextMgr: Entry %u, Group %u, Id %u in table `creature_text` has non-existing or incompatible BroadcastTextId %u.", temp.entry, temp.group, temp.id, temp.BroadcastTextId);
                 temp.BroadcastTextId = 0;
@@ -181,7 +183,7 @@ void CreatureTextMgr::LoadCreatureTextLocales()
         if (locale == LOCALE_enUS)
             continue;
 
-        ObjectMgr::AddLocaleString(Text, locale, data.Text);
+        sGameLocale->AddLocaleString(Text, locale, data.Text);
 
     } while (result->NextRow());
 
@@ -301,15 +303,15 @@ uint32 CreatureTextMgr::SendChat(Creature* source, uint8 textGroup, WorldObject 
 
 float CreatureTextMgr::GetRangeForChatType(ChatMsg msgType) const
 {
-    float dist = sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_SAY);
+    float dist = sGameConfig->GetFloatConfig("ListenRange.Say");
     switch (msgType)
     {
         case CHAT_MSG_MONSTER_YELL:
-            dist = sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_YELL);
+            dist = sGameConfig->GetFloatConfig("ListenRange.Yell");
             break;
         case CHAT_MSG_MONSTER_EMOTE:
         case CHAT_MSG_RAID_BOSS_EMOTE:
-            dist = sWorld->getFloatConfig(CONFIG_LISTEN_RANGE_TEXTEMOTE);
+            dist = sGameConfig->GetFloatConfig("ListenRange.TextEmote");
             break;
         default:
             break;
@@ -440,7 +442,7 @@ bool CreatureTextMgr::TextExist(uint32 sourceEntry, uint8 textGroup)
     if (sList == mTextMap.end())
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_UNITS, "CreatureTextMgr::TextExist: Could not find Text for Creature (entry %u) in 'creature_text' table.", sourceEntry);
+        LOG_DEBUG("entities.units", "CreatureTextMgr::TextExist: Could not find Text for Creature (entry %u) in 'creature_text' table.", sourceEntry);
 #endif
         return false;
     }
@@ -450,7 +452,7 @@ bool CreatureTextMgr::TextExist(uint32 sourceEntry, uint8 textGroup)
     if (itr == textHolder.end())
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_UNITS, "CreatureTextMgr::TextExist: Could not find TextGroup %u for Creature (entry %u).", uint32(textGroup), sourceEntry);
+        LOG_DEBUG("entities.units", "CreatureTextMgr::TextExist: Could not find TextGroup %u for Creature (entry %u).", uint32(textGroup), sourceEntry);
 #endif
         return false;
     }
@@ -481,7 +483,7 @@ std::string CreatureTextMgr::GetLocalizedChatString(uint32 entry, uint8 gender, 
 
     std::string baseText = "";
 
-    BroadcastText const* bct = sObjectMgr->GetBroadcastText(groupItr->BroadcastTextId);
+    BroadcastText const* bct = sGameLocale->GetBroadcastText(groupItr->BroadcastTextId);
     if (bct)
         baseText = bct->GetText(locale, gender);
     else
@@ -491,7 +493,7 @@ std::string CreatureTextMgr::GetLocalizedChatString(uint32 entry, uint8 gender, 
     {
         LocaleCreatureTextMap::const_iterator locItr = mLocaleTextMap.find(CreatureTextId(entry, uint32(textGroup), id));
         if (locItr != mLocaleTextMap.end())
-            ObjectMgr::GetLocaleString(locItr->second.Text, locale, baseText);
+            sGameLocale->GetLocaleString(locItr->second.Text, locale, baseText);
     }
 
     return baseText;

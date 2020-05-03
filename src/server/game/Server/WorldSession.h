@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,12 +16,13 @@
 #include "AddonMgr.h"
 #include "DatabaseEnv.h"
 #include "World.h"
+#include "Opcodes.h"
 #include "WorldPacket.h"
 #include "GossipDef.h"
 #include "Cryptography/BigNumber.h"
 #include "AccountMgr.h"
 #include "BanManager.h"
-#include "Opcodes.h"
+#include "Log.h"
 
 class Creature;
 class GameObject;
@@ -317,8 +318,6 @@ class WorldSession
                 m_TutorialsChanged = true;
             }
         }
-        //used with item_page table
-        bool SendItemInfo(uint32 itemid, WorldPacket data);
         //auction
         void SendAuctionHello(uint64 guid, Creature* unit);
         void SendAuctionCommandResult(uint32 auctionId, uint32 Action, uint32 ErrorCode, uint32 bidError = 0);
@@ -358,28 +357,18 @@ class WorldSession
         void ResetClientTimeDelay() { m_clientTimeDelay = 0; }
 
         std::atomic<time_t> m_timeOutTime;
-        void UpdateTimeOutTime(uint32 diff)
-        {
-            if (time_t(diff) > m_timeOutTime)
-                m_timeOutTime = 0;
-            else
-                m_timeOutTime -= diff;
-        }
-        void ResetTimeOutTime(bool onlyActive)
-        {
-            if (GetPlayer())
-                m_timeOutTime = int32(sWorld->getIntConfig(CONFIG_SOCKET_TIMEOUTTIME_ACTIVE));
-            else if (!onlyActive)
-                m_timeOutTime = int32(sWorld->getIntConfig(CONFIG_SOCKET_TIMEOUTTIME));
-        }
-        bool IsConnectionIdle() const
-        {
-            return (m_timeOutTime <= 0 && !m_inQueue);
-        }
+
+        void UpdateTimeOutTime(uint32 diff);
+        void ResetTimeOutTime(bool onlyActive);
+        bool IsConnectionIdle() const;
 
         // Recruit-A-Friend Handling
         uint32 GetRecruiterId() const { return recruiterId; }
         bool IsARecruiter() const { return isRecruiter; }
+
+        // Packets cooldown
+        time_t GetCalendarEventCreationCooldown() const { return _calendarEventCreationCooldown; }
+        void SetCalendarEventCreationCooldown(time_t cooldown) { _calendarEventCreationCooldown = cooldown; }
 
     public:                                                 // opcodes handlers
 
@@ -405,7 +394,6 @@ class WorldSession
         // new
         void HandleMoveUnRootAck(WorldPacket& recvPacket);
         void HandleMoveRootAck(WorldPacket& recvPacket);
-        void HandleLookingForGroup(WorldPacket& recvPacket);
 
         // new inspect
         void HandleInspectOpcode(WorldPacket& recvPacket);
@@ -433,8 +421,6 @@ class WorldSession
         void HandleMoveTeleportAck(WorldPacket& recvPacket);
         void HandleForceSpeedChangeAck(WorldPacket& recvData);
 
-        void HandlePingOpcode(WorldPacket& recvPacket);
-        void HandleAuthSessionOpcode(WorldPacket& recvPacket);
         void HandleRepopRequestOpcode(WorldPacket& recvPacket);
         void HandleAutostoreLootItemOpcode(WorldPacket& recvPacket);
         void HandleLootMoneyOpcode(WorldPacket& recvPacket);
@@ -484,7 +470,6 @@ class WorldSession
         void HandleSetActionButtonOpcode(WorldPacket& recvPacket);
 
         void HandleGameObjectUseOpcode(WorldPacket& recPacket);
-        void HandleMeetingStoneInfo(WorldPacket& recPacket);
         void HandleGameobjectReportUse(WorldPacket& recvPacket);
 
         void HandleNameQueryOpcode(WorldPacket& recvPacket);
@@ -511,7 +496,6 @@ class WorldSession
         void HandleBattlefieldStatusOpcode(WorldPacket& recvData);
 
         void HandleGroupInviteOpcode(WorldPacket& recvPacket);
-        //void HandleGroupCancelOpcode(WorldPacket& recvPacket);
         void HandleGroupAcceptOpcode(WorldPacket& recvPacket);
         void HandleGroupDeclineOpcode(WorldPacket& recvPacket);
         void HandleGroupUninviteOpcode(WorldPacket& recvPacket);
@@ -631,7 +615,6 @@ class WorldSession
         void HandleQueryNextMailTime(WorldPacket& recvData);
         void HandleCancelChanneling(WorldPacket& recvData);
 
-        void SendItemPageInfo(ItemTemplate* itemProto);
         void HandleSplitItemOpcode(WorldPacket& recvPacket);
         void HandleSwapInvItemOpcode(WorldPacket& recvPacket);
         void HandleDestroyItemOpcode(WorldPacket& recvPacket);
@@ -713,7 +696,6 @@ class WorldSession
         void HandleChannelBan(WorldPacket& recvPacket);
         void HandleChannelUnban(WorldPacket& recvPacket);
         void HandleChannelAnnouncements(WorldPacket& recvPacket);
-        void HandleChannelModerate(WorldPacket& recvPacket);
         void HandleChannelDeclineInvite(WorldPacket& recvPacket);
         void HandleChannelDisplayListQuery(WorldPacket& recvPacket);
         void HandleGetChannelMemberCount(WorldPacket& recvPacket);
@@ -947,34 +929,36 @@ class WorldSession
         QueryCallback_3<PreparedQueryResult, uint8, uint8, uint32> _openWrappedItemCallback;
 
         friend class World;
+    protected:
+        class DosProtection
+        {
+            friend class World;
+        public:
+            DosProtection(WorldSession* s);
+            bool EvaluateOpcode(WorldPacket& p, time_t time) const;
+        
         protected:
-            class DosProtection
+            enum Policy
             {
-                friend class World;
-                public:
-                    DosProtection(WorldSession* s) : Session(s), _policy((Policy)sWorld->getIntConfig(CONFIG_PACKET_SPOOF_POLICY)) { }
-                    bool EvaluateOpcode(WorldPacket& p, time_t time) const;
-                protected:
-                    enum Policy
-                    {
-                        POLICY_LOG,
-                        POLICY_KICK,
-                        POLICY_BAN
-                    };
+                POLICY_LOG,
+                POLICY_KICK,
+                POLICY_BAN,
+            };
 
-                    uint32 GetMaxPacketCounterAllowed(uint16 opcode) const;
+            uint32 GetMaxPacketCounterAllowed(uint16 opcode) const;
 
-                    WorldSession* Session;
+            WorldSession* Session;
 
-                private:
-                    Policy _policy;
-                    typedef std::unordered_map<uint16, PacketCounter> PacketThrottlingMap;
-                    // mark this member as "mutable" so it can be modified even in const functions
-                    mutable PacketThrottlingMap _PacketThrottlingMap;
+        private:
+            Policy _policy;
+            typedef std::unordered_map<uint16, PacketCounter> PacketThrottlingMap;
+            // mark this member as "mutable" so it can be modified even in const functions
+            mutable PacketThrottlingMap _PacketThrottlingMap;
 
-                    DosProtection(DosProtection const& right) = delete;
-                    DosProtection& operator=(DosProtection const& right) = delete;
-            } AntiDOS;
+            DosProtection(DosProtection const& right) = delete;
+            DosProtection& operator=(DosProtection const& right) = delete;
+
+        } AntiDOS;
 
     public:
         // xinef: those must be public, requires calls out of worldsession :(
@@ -1037,10 +1021,12 @@ class WorldSession
         bool isRecruiter;
         ACE_Based::LockedQueue<WorldPacket*, ACE_Thread_Mutex> _recvQueue;
         uint64 m_currentBankerGUID;
-        time_t timeWhoCommandAllowed;
+        time_t timerGsSpam;
         uint32 _offlineTime;
         bool _kicked;
         bool _shouldSetOfflineInDB;
+        // Packets cooldown
+        time_t _calendarEventCreationCooldown;
 };
 #endif
 /// @}

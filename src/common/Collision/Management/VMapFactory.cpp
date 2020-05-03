@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -15,8 +15,9 @@ namespace VMAP
     // just return the instance
     IVMapManager* VMapFactory::createOrGetVMapManager()
     {
-        if (gVMapManager == 0)
+        if (gVMapManager == nullptr)
             gVMapManager= new VMapManager2();                // should be taken from config ... Please change if you like :-)
+
         return gVMapManager;
     }
 

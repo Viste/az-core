@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -24,7 +24,7 @@
 class MessageBuffer;
 
 // Root of ByteBuffer exception hierarchy
-class ByteBufferException : public std::exception
+class AC_COMMON_API ByteBufferException : public std::exception
 {
 public:
     ~ByteBufferException() noexcept = default;
@@ -38,7 +38,7 @@ private:
     std::string msg_;
 };
 
-class ByteBufferPositionException : public ByteBufferException
+class AC_COMMON_API ByteBufferPositionException : public ByteBufferException
 {
 public:
     ByteBufferPositionException(bool add, size_t pos, size_t size, size_t valueSize);
@@ -46,7 +46,7 @@ public:
     ~ByteBufferPositionException() noexcept = default;
 };
 
-class ByteBufferSourceException : public ByteBufferException
+class AC_COMMON_API ByteBufferSourceException : public ByteBufferException
 {
 public:
     ByteBufferSourceException(size_t pos, size_t size, size_t valueSize);
@@ -62,7 +62,7 @@ public:
     ~ByteBufferInvalidValueException() noexcept = default;
 };
 
-class ByteBuffer
+class AC_COMMON_API ByteBuffer
 {
     public:
         constexpr static size_t DEFAULT_SIZE = 0x1000;

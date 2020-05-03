@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -23,11 +23,13 @@
 #include "GameEventMgr.h"
 #include "WorldSession.h"
 #include "Opcodes.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 namespace lfg
 {
 
-LFGMgr::LFGMgr(): m_lfgProposalId(1), m_options(sWorld->getIntConfig(CONFIG_LFG_OPTIONSMASK))
+LFGMgr::LFGMgr(): m_lfgProposalId(1), m_options(sGameConfig->GetIntConfig("DungeonFinder.OptionsMask"))
 {
     new LFGPlayerScript();
     new LFGGroupScript();
@@ -127,10 +129,10 @@ void LFGMgr::LoadRewards()
             continue;
         }
 
-        if (!maxLevel || maxLevel > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL))
+        if (!maxLevel || maxLevel > sGameConfig->GetIntConfig("MaxPlayerLevel"))
         {
             sLog->outError("Level %u specified for dungeon %u in table `lfg_dungeon_rewards` can never be reached!", maxLevel, dungeonId);
-            maxLevel = sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL);
+            maxLevel = sGameConfig->GetIntConfig("MaxPlayerLevel");
         }
 
         if (!firstQuestId || !sObjectMgr->GetQuestTemplate(firstQuestId))
@@ -221,6 +223,7 @@ void LFGMgr::LoadLFGDungeons(bool reload /* = false */)
     while (result->NextRow());
 
     sLog->outString(">> Loaded %u lfg entrance positions in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    sLog->outString();
 
     // Fill all other teleport coords from areatriggers
     for (LFGDungeonContainer::iterator itr = LfgDungeonStore.begin(); itr != LfgDungeonStore.end(); ++itr)
@@ -266,7 +269,7 @@ void LFGMgr::Update(uint32 tdiff, uint8 task)
 
     if (task == 0)
     {
-        time_t currTime = time(NULL);
+        time_t currTime = GameTime::GetGameTime();
 
         // Remove obsolete role checks
         for (LfgRoleCheckContainer::iterator it = RoleChecksStore.begin(); it != RoleChecksStore.end();)
@@ -626,7 +629,7 @@ void LFGMgr::JoinLfg(Player* player, uint8 roles, LfgDungeonSet& dungeons, const
     if (joinData.result != LFG_JOIN_OK)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::Join: [" UI64FMTD "] joining with %u members. result: %u", guid, grp ? grp->GetMembersCount() : 1, joinData.result);
+        LOG_DEBUG("lfg", "LFGMgr::Join: [" UI64FMTD "] joining with %u members. result: %u", guid, grp ? grp->GetMembersCount() : 1, joinData.result);
 #endif
         if (!dungeons.empty())                             // Only should show lockmap when have no dungeons available
             joinData.lockmap.clear();
@@ -656,7 +659,7 @@ void LFGMgr::JoinLfg(Player* player, uint8 roles, LfgDungeonSet& dungeons, const
         // Create new rolecheck
         LfgRoleCheck& roleCheck = RoleChecksStore[gguid];
         roleCheck.roles.clear(); // pussywizard: NEW rolecheck, not old one with trash data >_>
-        roleCheck.cancelTime = time_t(time(NULL)) + LFG_TIME_ROLECHECK;
+        roleCheck.cancelTime = time_t(GameTime::GetGameTime()) + LFG_TIME_ROLECHECK;
         roleCheck.state = LFG_ROLECHECK_INITIALITING;
         roleCheck.leader = guid;
         roleCheck.dungeons = dungeons;
@@ -694,7 +697,7 @@ void LFGMgr::JoinLfg(Player* player, uint8 roles, LfgDungeonSet& dungeons, const
         LfgRolesMap rolesMap;
         rolesMap[guid] = roles;
         LFGQueue& queue = GetQueue(guid);
-        queue.AddQueueData(guid, time(NULL), dungeons, rolesMap);
+        queue.AddQueueData(guid, GameTime::GetGameTime(), dungeons, rolesMap);
 
         if (!isContinue)
         {
@@ -732,7 +735,7 @@ void LFGMgr::JoinLfg(Player* player, uint8 roles, LfgDungeonSet& dungeons, const
 */
 void LFGMgr::LeaveLfg(uint64 guid)
 {
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::Leave: [" UI64FMTD "]", guid);
+    LOG_DEBUG("lfg", "LFGMgr::Leave: [" UI64FMTD "]", guid);
     uint64 gguid = IS_GROUP_GUID(guid) ? guid : GetGroup(guid);
     LfgState state = GetState(guid);
     switch (state)
@@ -893,7 +896,7 @@ void LFGMgr::UpdateRaidBrowser(uint32 diff)
             m_raidBrowserUpdateTimer[team] = 0;
     }
 
-    if (getMSTimeDiff(World::GetGameTimeMS(), getMSTime()) > (70*7)/5) // prevent lagging
+    if (getMSTimeDiff(GameTime::GetGameTimeMS(), getMSTime()) > (70*7)/5) // prevent lagging
         return;
 
     uint64 guid, groupGuid, instanceGuid;
@@ -1361,7 +1364,7 @@ void LFGMgr::UpdateRoleCheck(uint64 gguid, uint64 guid /* = 0 */, uint8 roles /*
     {
         SetState(gguid, LFG_STATE_QUEUED);
         LFGQueue& queue = GetQueue(gguid);
-        queue.AddQueueData(gguid, time_t(time(NULL)), roleCheck.dungeons, roleCheck.roles);
+        queue.AddQueueData(gguid, time_t(GameTime::GetGameTime()), roleCheck.dungeons, roleCheck.roles);
         RoleChecksStore.erase(itRoleCheck);
     }
     else if (roleCheck.state != LFG_ROLECHECK_INITIALITING)
@@ -1614,7 +1617,7 @@ void LFGMgr::UpdateProposal(uint32 proposalId, uint64 guid, bool accept)
     player.accept = LfgAnswer(accept);
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::UpdateProposal: Player [" UI64FMTD "] of proposal %u selected: %u", guid, proposalId, accept);
+    LOG_DEBUG("lfg", "LFGMgr::UpdateProposal: Player [" UI64FMTD "] of proposal %u selected: %u", guid, proposalId, accept);
 #endif
     if (!accept)
     {
@@ -1638,7 +1641,7 @@ void LFGMgr::UpdateProposal(uint32 proposalId, uint64 guid, bool accept)
 
     bool sendUpdate = proposal.state != LFG_PROPOSAL_SUCCESS;
     proposal.state = LFG_PROPOSAL_SUCCESS;
-    time_t joinTime = time(NULL);
+    time_t joinTime = GameTime::GetGameTime();
 
     LFGQueue& queue = GetQueue(guid);
     LfgUpdateData updateData = LfgUpdateData(LFG_UPDATETYPE_GROUP_FOUND);
@@ -1707,7 +1710,7 @@ void LFGMgr::RemoveProposal(LfgProposalContainer::iterator itProposal, LfgUpdate
     proposal.state = LFG_PROPOSAL_FAILED;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::RemoveProposal: Proposal %u, state FAILED, UpdateType %u", itProposal->first, type);
+    LOG_DEBUG("lfg", "LFGMgr::RemoveProposal: Proposal %u, state FAILED, UpdateType %u", itProposal->first, type);
 #endif
     // Mark all people that didn't answered as no accept
     if (type == LFG_UPDATETYPE_PROPOSAL_FAILED)
@@ -1753,14 +1756,14 @@ void LFGMgr::RemoveProposal(LfgProposalContainer::iterator itProposal, LfgUpdate
             {
                 updateData.updateType = type;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::RemoveProposal: [" UI64FMTD "] didn't accept. Removing from queue and compatible cache", guid);
+                LOG_DEBUG("lfg", "LFGMgr::RemoveProposal: [" UI64FMTD "] didn't accept. Removing from queue and compatible cache", guid);
 #endif
             }
             else
             {
                 updateData.updateType = LFG_UPDATETYPE_REMOVED_FROM_QUEUE;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-                sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::RemoveProposal: [" UI64FMTD "] in same group that someone that didn't accept. Removing from queue and compatible cache", guid);
+                LOG_DEBUG("lfg", "LFGMgr::RemoveProposal: [" UI64FMTD "] in same group that someone that didn't accept. Removing from queue and compatible cache", guid);
 #endif
             }
 
@@ -1776,7 +1779,7 @@ void LFGMgr::RemoveProposal(LfgProposalContainer::iterator itProposal, LfgUpdate
         else
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::RemoveProposal: Readding [" UI64FMTD "] to queue.", guid);
+            LOG_DEBUG("lfg", "LFGMgr::RemoveProposal: Readding [" UI64FMTD "] to queue.", guid);
 #endif
             SetState(guid, LFG_STATE_QUEUED);
             if (gguid != guid)
@@ -1824,7 +1827,7 @@ void LFGMgr::InitBoot(uint64 gguid, uint64 kicker, uint64 victim, std::string co
 
     LfgPlayerBoot& boot = BootsStore[gguid];
     boot.inProgress = true;
-    boot.cancelTime = time_t(time(NULL)) + LFG_TIME_BOOT;
+    boot.cancelTime = time_t(GameTime::GetGameTime()) + LFG_TIME_BOOT;
     boot.reason = reason;
     boot.victim = victim;
 
@@ -1986,7 +1989,7 @@ void LFGMgr::TeleportPlayer(Player* player, bool out, bool fromOpcode /*= false*
     if (error != LFG_TELEPORTERROR_OK)
         player->GetSession()->SendLfgTeleportError(uint8(error));
 
-    //sLog->outDebug(LOG_FILTER_LFG, "TeleportPlayer: Player %s is being teleported in to map %u "
+    //LOG_DEBUG("lfg", "TeleportPlayer: Player %s is being teleported in to map %u "
     //    "(x: %f, y: %f, z: %f) Result: %u", player->GetName().c_str(), dungeon->map,
     //    dungeon->x, dungeon->y, dungeon->z, error);
 }
@@ -2002,13 +2005,13 @@ void LFGMgr::FinishDungeon(uint64 gguid, const uint32 dungeonId, const Map* curr
     uint32 gDungeonId = GetDungeon(gguid);
     if (gDungeonId != dungeonId)
     {
-        sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::FinishDungeon: [" UI64FMTD "] Finished dungeon %u but group queued for %u. Ignoring", gguid, dungeonId, gDungeonId);
+        LOG_DEBUG("lfg", "LFGMgr::FinishDungeon: [" UI64FMTD "] Finished dungeon %u but group queued for %u. Ignoring", gguid, dungeonId, gDungeonId);
         return;
     }
 
     if (GetState(gguid) == LFG_STATE_FINISHED_DUNGEON) // Shouldn't happen. Do not reward multiple times
     {
-        sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::FinishDungeon: [" UI64FMTD "] Already rewarded group. Ignoring", gguid);
+        LOG_DEBUG("lfg", "LFGMgr::FinishDungeon: [" UI64FMTD "] Already rewarded group. Ignoring", gguid);
         return;
     }
 
@@ -2021,7 +2024,7 @@ void LFGMgr::FinishDungeon(uint64 gguid, const uint32 dungeonId, const Map* curr
         uint64 guid = (*it);
         if (GetState(guid) == LFG_STATE_FINISHED_DUNGEON)
         {
-            sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::FinishDungeon: [" UI64FMTD "] Already rewarded player. Ignoring", guid);
+            LOG_DEBUG("lfg", "LFGMgr::FinishDungeon: [" UI64FMTD "] Already rewarded player. Ignoring", guid);
             continue;
         }
 
@@ -2037,14 +2040,14 @@ void LFGMgr::FinishDungeon(uint64 gguid, const uint32 dungeonId, const Map* curr
 
         if (!dungeon || (dungeon->type != LFG_TYPE_RANDOM && !dungeon->seasonal))
         {
-            sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::FinishDungeon: [" UI64FMTD "] dungeon %u is not random or seasonal", guid, rDungeonId);
+            LOG_DEBUG("lfg", "LFGMgr::FinishDungeon: [" UI64FMTD "] dungeon %u is not random or seasonal", guid, rDungeonId);
             continue;
         }
 
         Player* player = ObjectAccessor::FindPlayer(guid);
         if (!player || player->FindMap() != currMap) // pussywizard: currMap - multithreading crash if on other map (map id check is not enough, binding system is not reliable)
         {
-            sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::FinishDungeon: [" UI64FMTD "] not found in world", guid);
+            LOG_DEBUG("lfg", "LFGMgr::FinishDungeon: [" UI64FMTD "] not found in world", guid);
             continue;
         }
 
@@ -2053,7 +2056,7 @@ void LFGMgr::FinishDungeon(uint64 gguid, const uint32 dungeonId, const Map* curr
 
         if (player->GetMapId() != mapId)
         {
-            sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::FinishDungeon: [" UI64FMTD "] is in map %u and should be in %u to get reward", guid, player->GetMapId(), mapId);
+            LOG_DEBUG("lfg", "LFGMgr::FinishDungeon: [" UI64FMTD "] is in map %u and should be in %u to get reward", guid, player->GetMapId(), mapId);
             continue;
         }
 
@@ -2085,7 +2088,7 @@ void LFGMgr::FinishDungeon(uint64 gguid, const uint32 dungeonId, const Map* curr
         }
 
         // Give rewards
-        sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::FinishDungeon: [" UI64FMTD "] done dungeon %u, %s previously done.", player->GetGUID(), GetDungeon(gguid), done? " " : " not");
+        LOG_DEBUG("lfg", "LFGMgr::FinishDungeon: [" UI64FMTD "] done dungeon %u, %s previously done.", player->GetGUID(), GetDungeon(gguid), done? " " : " not");
         LfgPlayerRewardData data = LfgPlayerRewardData(dungeon->Entry(), GetDungeon(gguid, false), done, quest);
         player->GetSession()->SendLfgPlayerReward(data);
     }
@@ -2154,7 +2157,7 @@ LfgState LFGMgr::GetState(uint64 guid)
         state = PlayersStore[guid].GetState();
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetState: [" UI64FMTD "] = %u", guid, state);
+    LOG_DEBUG("lfg", "LFGMgr::GetState: [" UI64FMTD "] = %u", guid, state);
 #endif
     return state;
 }
@@ -2168,7 +2171,7 @@ LfgState LFGMgr::GetOldState(uint64 guid)
         state = PlayersStore[guid].GetOldState();
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetOldState: [" UI64FMTD "] = %u", guid, state);
+    LOG_DEBUG("lfg", "LFGMgr::GetOldState: [" UI64FMTD "] = %u", guid, state);
 #endif
     return state;
 }
@@ -2177,7 +2180,7 @@ uint32 LFGMgr::GetDungeon(uint64 guid, bool asId /*= true */)
 {
     uint32 dungeon = GroupsStore[guid].GetDungeon(asId);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetDungeon: [" UI64FMTD "] asId: %u = %u", guid, asId, dungeon);
+    LOG_DEBUG("lfg", "LFGMgr::GetDungeon: [" UI64FMTD "] asId: %u = %u", guid, asId, dungeon);
 #endif
     return dungeon;
 }
@@ -2191,7 +2194,7 @@ uint32 LFGMgr::GetDungeonMapId(uint64 guid)
             mapId = dungeon->map;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetDungeonMapId: [" UI64FMTD "] = %u (DungeonId = %u)", guid, mapId, dungeonId);
+    LOG_DEBUG("lfg", "LFGMgr::GetDungeonMapId: [" UI64FMTD "] = %u (DungeonId = %u)", guid, mapId, dungeonId);
 #endif
     return mapId;
 }
@@ -2200,7 +2203,7 @@ uint8 LFGMgr::GetRoles(uint64 guid)
 {
     uint8 roles = PlayersStore[guid].GetRoles();
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetRoles: [" UI64FMTD "] = %u", guid, roles);
+    LOG_DEBUG("lfg", "LFGMgr::GetRoles: [" UI64FMTD "] = %u", guid, roles);
 #endif
     return roles;
 }
@@ -2208,7 +2211,7 @@ uint8 LFGMgr::GetRoles(uint64 guid)
 const std::string& LFGMgr::GetComment(uint64 guid)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetComment: [" UI64FMTD "] = %s", guid, PlayersStore[guid].GetComment().c_str());
+    LOG_DEBUG("lfg", "LFGMgr::GetComment: [" UI64FMTD "] = %s", guid, PlayersStore[guid].GetComment().c_str());
 #endif
     return PlayersStore[guid].GetComment();
 }
@@ -2216,7 +2219,7 @@ const std::string& LFGMgr::GetComment(uint64 guid)
 LfgDungeonSet const& LFGMgr::GetSelectedDungeons(uint64 guid)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetSelectedDungeons: [" UI64FMTD "]", guid);
+    LOG_DEBUG("lfg", "LFGMgr::GetSelectedDungeons: [" UI64FMTD "]", guid);
 #endif
     return PlayersStore[guid].GetSelectedDungeons();
 }
@@ -2224,7 +2227,7 @@ LfgDungeonSet const& LFGMgr::GetSelectedDungeons(uint64 guid)
 LfgLockMap const& LFGMgr::GetLockedDungeons(uint64 guid)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetLockedDungeons: [" UI64FMTD "]", guid);
+    LOG_DEBUG("lfg", "LFGMgr::GetLockedDungeons: [" UI64FMTD "]", guid);
 #endif
     return PlayersStore[guid].GetLockedDungeons();
 }
@@ -2233,7 +2236,7 @@ uint8 LFGMgr::GetKicksLeft(uint64 guid)
 {
     uint8 kicks = GroupsStore[guid].GetKicksLeft();
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::GetKicksLeft: [" UI64FMTD "] = %u", guid, kicks);
+    LOG_DEBUG("lfg", "LFGMgr::GetKicksLeft: [" UI64FMTD "] = %u", guid, kicks);
 #endif
     return kicks;
 }
@@ -2275,7 +2278,7 @@ void LFGMgr::SetState(uint64 guid, LfgState state)
         std::string ns = GetStateString(state);
         std::string ps = GetStateString(data.GetState());
         std::string os = GetStateString(data.GetOldState());
-        sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::SetState: Group: [" UI64FMTD "] newState: %s, previous: %s, oldState: %s", guid, ns.c_str(), ps.c_str(), os.c_str());
+        LOG_DEBUG("lfg", "LFGMgr::SetState: Group: [" UI64FMTD "] newState: %s, previous: %s, oldState: %s", guid, ns.c_str(), ps.c_str(), os.c_str());
         data.SetState(state);
     }
     else
@@ -2284,7 +2287,7 @@ void LFGMgr::SetState(uint64 guid, LfgState state)
         std::string ns = GetStateString(state);
         std::string ps = GetStateString(data.GetState());
         std::string os = GetStateString(data.GetOldState());
-        sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::SetState: Player: [" UI64FMTD "] newState: %s, previous: %s, oldState: %s", guid, ns.c_str(), ps.c_str(), os.c_str());
+        LOG_DEBUG("lfg", "LFGMgr::SetState: Player: [" UI64FMTD "] newState: %s, previous: %s, oldState: %s", guid, ns.c_str(), ps.c_str(), os.c_str());
         data.SetState(state);
     }
 }
@@ -2297,7 +2300,7 @@ void LFGMgr::SetCanOverrideRBState(uint64 guid, bool val)
 void LFGMgr::SetDungeon(uint64 guid, uint32 dungeon)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::SetDungeon: [" UI64FMTD "] dungeon %u", guid, dungeon);
+    LOG_DEBUG("lfg", "LFGMgr::SetDungeon: [" UI64FMTD "] dungeon %u", guid, dungeon);
 #endif
     GroupsStore[guid].SetDungeon(dungeon);
 }
@@ -2305,7 +2308,7 @@ void LFGMgr::SetDungeon(uint64 guid, uint32 dungeon)
 void LFGMgr::SetRoles(uint64 guid, uint8 roles)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::SetRoles: [" UI64FMTD "] roles: %u", guid, roles);
+    LOG_DEBUG("lfg", "LFGMgr::SetRoles: [" UI64FMTD "] roles: %u", guid, roles);
 #endif
     PlayersStore[guid].SetRoles(roles);
 }
@@ -2313,7 +2316,7 @@ void LFGMgr::SetRoles(uint64 guid, uint8 roles)
 void LFGMgr::SetComment(uint64 guid, std::string const& comment)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::SetComment: [" UI64FMTD "] comment: %s", guid, comment.c_str());
+    LOG_DEBUG("lfg", "LFGMgr::SetComment: [" UI64FMTD "] comment: %s", guid, comment.c_str());
 #endif
     PlayersStore[guid].SetComment(comment);
 }
@@ -2334,7 +2337,7 @@ void LFGMgr::LfrSetComment(Player* p, std::string comment)
 void LFGMgr::SetSelectedDungeons(uint64 guid, LfgDungeonSet const& dungeons)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::SetLockedDungeons: [" UI64FMTD "]", guid);
+    LOG_DEBUG("lfg", "LFGMgr::SetLockedDungeons: [" UI64FMTD "]", guid);
 #endif
     PlayersStore[guid].SetSelectedDungeons(dungeons);
 }
@@ -2342,7 +2345,7 @@ void LFGMgr::SetSelectedDungeons(uint64 guid, LfgDungeonSet const& dungeons)
 void LFGMgr::SetLockedDungeons(uint64 guid, LfgLockMap const& lock)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::SetLockedDungeons: [" UI64FMTD "]", guid);
+    LOG_DEBUG("lfg", "LFGMgr::SetLockedDungeons: [" UI64FMTD "]", guid);
 #endif
     PlayersStore[guid].SetLockedDungeons(lock);
 }
@@ -2350,7 +2353,7 @@ void LFGMgr::SetLockedDungeons(uint64 guid, LfgLockMap const& lock)
 void LFGMgr::DecreaseKicksLeft(uint64 guid)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::DecreaseKicksLeft: [" UI64FMTD "]", guid);
+    LOG_DEBUG("lfg", "LFGMgr::DecreaseKicksLeft: [" UI64FMTD "]", guid);
 #endif
     GroupsStore[guid].DecreaseKicksLeft();
 }
@@ -2358,7 +2361,7 @@ void LFGMgr::DecreaseKicksLeft(uint64 guid)
 void LFGMgr::RemoveGroupData(uint64 guid)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_LFG, "LFGMgr::RemoveGroupData: [" UI64FMTD "]", guid);
+    LOG_DEBUG("lfg", "LFGMgr::RemoveGroupData: [" UI64FMTD "]", guid);
 #endif
     LfgGroupDataContainer::iterator it = GroupsStore.find(guid);
     if (it == GroupsStore.end())
@@ -2402,7 +2405,7 @@ void LFGMgr::SetLeader(uint64 gguid, uint64 leader)
 
 void LFGMgr::SetTeam(uint64 guid, TeamId teamId)
 {
-    if (sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GROUP))
+    if (sGameConfig->GetBoolConfig("AllowTwoSide.Interaction.Group"))
         teamId = TEAM_ALLIANCE; // @Not Sure About That TeamId is supposed to be uint8 Team = 0(@TrinityCore)
 
     PlayersStore[guid].SetTeam(teamId);

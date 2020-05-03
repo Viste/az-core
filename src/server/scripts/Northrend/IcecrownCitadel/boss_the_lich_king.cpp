@@ -16,6 +16,7 @@
 #include "GridNotifiersImpl.h"
 #include "CreatureTextMgr.h"
 #include "icecrown_citadel.h"
+#include "GameTime.h"
 
 enum Texts
 {
@@ -686,9 +687,9 @@ class boss_the_lich_king : public CreatureScript
 
             void KilledUnit(Unit* victim)
             {
-                if (victim->GetTypeId() == TYPEID_PLAYER && !me->IsInEvadeMode() && _phase != PHASE_OUTRO && _lastTalkTimeKill+5 < time(NULL))
+                if (victim->GetTypeId() == TYPEID_PLAYER && !me->IsInEvadeMode() && _phase != PHASE_OUTRO && _lastTalkTimeKill+5 < GameTime::GetGameTime())
                 {
-                    _lastTalkTimeKill = time(NULL);
+                    _lastTalkTimeKill = GameTime::GetGameTime();
                     Talk(SAY_LK_KILL);
                 }
             }
@@ -717,7 +718,7 @@ class boss_the_lich_king : public CreatureScript
                                 events.RescheduleEvent(EVENT_START_ATTACK, 1000);
                             EntryCheckPredicate pred(NPC_STRANGULATE_VEHICLE);
                             summons.DoAction(ACTION_TELEPORT_BACK, pred);
-                            if (!IsHeroic() && _phase != PHASE_OUTRO && me->IsInCombat() && _lastTalkTimeBuff+5 <= time(NULL))
+                            if (!IsHeroic() && _phase != PHASE_OUTRO && me->IsInCombat() && _lastTalkTimeBuff+5 <= GameTime::GetGameTime())
                                 Talk(SAY_LK_FROSTMOURNE_ESCAPE);
                         }
                         break;
@@ -874,9 +875,9 @@ class boss_the_lich_king : public CreatureScript
 
             void SpellHit(Unit* /*caster*/, SpellInfo const* spell)
             {
-                if (spell->Id == HARVESTED_SOUL_BUFF && me->IsInCombat() && !IsHeroic() && _phase != PHASE_OUTRO && _lastTalkTimeBuff+5 <= time(NULL))
+                if (spell->Id == HARVESTED_SOUL_BUFF && me->IsInCombat() && !IsHeroic() && _phase != PHASE_OUTRO && _lastTalkTimeBuff+5 <= GameTime::GetGameTime())
                 {
-                    _lastTalkTimeBuff = time(NULL);
+                    _lastTalkTimeBuff = GameTime::GetGameTime();
                     Talk(SAY_LK_FROSTMOURNE_KILL);
                 }
             }
@@ -1040,7 +1041,7 @@ class boss_the_lich_king : public CreatureScript
                     case EVENT_PAIN_AND_SUFFERING:
                         if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 0, 0.0f, true))
                         {
-                            //events.DelayEventsToMax(500, EVENT_GROUP_ABILITIES);
+                            //events.DelayEvents(500, EVENT_GROUP_ABILITIES);
                             me->SetOrientation(me->GetAngle(target));
                             me->CastSpell(target, SPELL_PAIN_AND_SUFFERING, false);
                         }
@@ -2418,14 +2419,14 @@ class spell_the_lich_king_defile : public SpellScriptLoader
             void CorrectRange(std::list<WorldObject*>& targets)
             {
                 targets.remove_if(VehicleCheck());
-                targets.remove_if(acore::AllWorldObjectsInExactRange(GetCaster(), 10.0f * GetCaster()->GetFloatValue(OBJECT_FIELD_SCALE_X), true));
+                targets.remove_if(acore::AllWorldObjectsInExactRange(GetCaster(), 10.0f * GetCaster()->GetObjectScale(), true));
                 uint32 strangulatedAura[4] = {68980, 74325, 74296, 74297};
                 targets.remove_if(acore::UnitAuraCheck(true, strangulatedAura[GetCaster()->GetMap()->GetDifficulty()]));
             }
 
             void ChangeDamageAndGrow()
             {
-                SetHitDamage(int32(GetHitDamage() * GetCaster()->GetFloatValue(OBJECT_FIELD_SCALE_X)));
+                SetHitDamage(int32(GetHitDamage() * GetCaster()->GetObjectScale()));
                 // HACK: target player should cast this spell on defile
                 // however with current aura handling auras cast by different units
                 // cannot stack on the same aura object increasing the stack count

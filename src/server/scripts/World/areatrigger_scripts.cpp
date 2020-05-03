@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -27,6 +27,7 @@ EndContentData */
 #include "ScriptedCreature.h"
 #include "Player.h"
 #include "SpellMgr.h"
+#include "GameTime.h"
 
 // Ours
 class AreaTrigger_at_voltarus_middle : public AreaTriggerScript
@@ -382,7 +383,7 @@ class AreaTrigger_at_brewfest : public AreaTriggerScript
         {
             uint32 triggerId = trigger->entry;
             // Second trigger happened too early after first, skip for now
-            if (sWorld->GetGameTime() - _triggerTimes[triggerId] < AREATRIGGER_TALK_COOLDOWN)
+            if (GameTime::GetGameTime() - _triggerTimes[triggerId] < AREATRIGGER_TALK_COOLDOWN)
                 return false;
 
             switch (triggerId)
@@ -399,7 +400,7 @@ class AreaTrigger_at_brewfest : public AreaTriggerScript
                     break;
             }
 
-            _triggerTimes[triggerId] = sWorld->GetGameTime();
+            _triggerTimes[triggerId] = GameTime::GetGameTime();
             return false;
         }
 
@@ -439,7 +440,7 @@ class AreaTrigger_at_area_52_entrance : public AreaTriggerScript
                 return false;
 
             uint32 triggerId = trigger->entry;
-            if (sWorld->GetGameTime() - _triggerTimes[trigger->entry] < SUMMON_COOLDOWN)
+            if (GameTime::GetGameTime() - _triggerTimes[trigger->entry] < SUMMON_COOLDOWN)
                 return false;
 
             switch (triggerId)
@@ -468,7 +469,7 @@ class AreaTrigger_at_area_52_entrance : public AreaTriggerScript
 
             player->SummonCreature(NPC_SPOTLIGHT, x, y, z, 0.0f, TEMPSUMMON_TIMED_DESPAWN, 5000);
             player->AddAura(SPELL_A52_NEURALYZER, player);
-            _triggerTimes[trigger->entry] = sWorld->GetGameTime();
+            _triggerTimes[trigger->entry] = GameTime::GetGameTime();
             return false;
         }
 

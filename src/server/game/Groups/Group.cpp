@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -29,6 +29,7 @@
 #include "SharedDefines.h"
 #include "MapManager.h"
 #include "UpdateFieldFlags.h"
+#include "GameTime.h"
 
 Roll::Roll(uint64 _guid, LootItem const& li) : itemGUID(_guid), itemid(li.itemid),
 itemRandomPropId(li.randomPropertyId), itemRandomSuffix(li.randomSuffix), itemCount(li.count),
@@ -66,7 +67,7 @@ Group::~Group()
     if (m_bgGroup)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_BATTLEGROUND, "Group::~Group: battleground group being deleted.");
+        LOG_DEBUG("bg", "Group::~Group: battleground group being deleted.");
 #endif
         if (m_bgGroup->GetBgRaid(TEAM_ALLIANCE) == this) m_bgGroup->SetBgRaid(TEAM_ALLIANCE, NULL);
         else if (m_bgGroup->GetBgRaid(TEAM_HORDE) == this) m_bgGroup->SetBgRaid(TEAM_HORDE, NULL);
@@ -1219,7 +1220,7 @@ void Group::NeedBeforeGreed(Loot* loot, WorldObject* lootedObject)
 void Group::MasterLoot(Loot* loot, WorldObject* pLootedObject)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "Group::MasterLoot (SMSG_LOOT_MASTER_LIST, 330)");
+    LOG_DEBUG("network", "Group::MasterLoot (SMSG_LOOT_MASTER_LIST, 330)");
 #endif
 
     for (std::vector<LootItem>::iterator i = loot->items.begin(); i != loot->items.end(); ++i)
@@ -2029,7 +2030,7 @@ void Group::BroadcastGroupUpdate(void)
             pp->ForceValuesUpdateAtIndex(UNIT_FIELD_BYTES_2);
             pp->ForceValuesUpdateAtIndex(UNIT_FIELD_FACTIONTEMPLATE);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("-- Forced group value update for '%s'", pp->GetName().c_str());
+            LOG_DEBUG("server", "-- Forced group value update for '%s'", pp->GetName().c_str());
 #endif
         }
     }
@@ -2340,3 +2341,15 @@ void Group::ToggleGroupMemberFlag(member_witerator slot, uint8 flag, bool apply)
     else
         slot->flags &= ~flag;
 }
+
+uint32 Group::GetDifficultyChangePreventionTime() const
+{
+    return _difficultyChangePreventionTime > GameTime::GetGameTime() ? _difficultyChangePreventionTime - GameTime::GetGameTime() : 0;
+}
+
+void Group::SetDifficultyChangePrevention(DifficultyPreventionChangeType type)
+{
+    _difficultyChangePreventionTime = GameTime::GetGameTime() + MINUTE;
+    _difficultyChangePreventionType = type;
+}
+

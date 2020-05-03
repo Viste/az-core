@@ -114,7 +114,7 @@ class boss_toravon : public CreatureScript
                 if (me->HasUnitState(UNIT_STATE_CASTING))
                     return;
 
-                switch (events.GetEvent())
+                switch (events.ExecuteEvent())
                 {
                     case EVENT_FREEZING_GROUND:
                         if (Unit* target = SelectTarget(SELECT_TARGET_RANDOM, 1))
@@ -122,7 +122,7 @@ class boss_toravon : public CreatureScript
                         events.RepeatEvent(20000);
                         break;
                     case EVENT_FROZEN_ORB_STALKER:
-                        me->CastCustomSpell(SPELL_FROZEN_ORB, SPELLVALUE_MAX_TARGETS, RAID_MODE(1, 3), me, false);
+                        me->CastCustomSpell(SPELL_FROZEN_ORB, SPELLVALUE_MAX_TARGETS, RAID_MODE(1, 3, 2, 4), me, false);
                         events.RepeatEvent(35000);
                         events.ScheduleEvent(EVENT_CHECK_SUMMONS, 10000);
                         break;

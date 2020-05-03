@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,11 +16,13 @@
 #include "CreatureAI.h"
 #include "Util.h"
 #include "Pet.h"
-#include "World.h"
 #include "Group.h"
 #include "SpellInfo.h"
 #include "Player.h"
 #include "Chat.h"
+#include "DisableMgr.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 class LoadPetFromDBQueryHolder : public SQLQueryHolder
 {
@@ -128,7 +130,7 @@ uint8 WorldSession::HandleLoadPetFromDBFirstCallback(PreparedQueryResult result,
     Map* map = owner->GetMap();
     uint32 guid = sObjectMgr->GenerateLowGuid(HIGHGUID_PET);
     Pet* pet = new Pet(owner, pet_type);
-    LoadPetFromDBQueryHolder* holder = new LoadPetFromDBQueryHolder(pet_number, current, uint32(time(NULL) - fields[14].GetUInt32()), fields[13].GetString(), savedhealth, savedmana);
+    LoadPetFromDBQueryHolder* holder = new LoadPetFromDBQueryHolder(pet_number, current, uint32(GameTime::GetGameTime() - fields[14].GetUInt32()), fields[13].GetString(), savedhealth, savedmana);
     if (!pet->Create(guid, map, owner->GetPhaseMask(), petentry, pet_number) || !holder->Initialize())
     {
         delete pet;
@@ -201,7 +203,7 @@ uint8 WorldSession::HandleLoadPetFromDBFirstCallback(PreparedQueryResult result,
             break;
     }
 
-    pet->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(time(NULL))); // cast can't be helped here
+    pet->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(GameTime::GetGameTime())); // cast can't be helped here
     pet->SetCreatorGUID(owner->GetGUID());
     owner->SetMinion(pet, true);
 
@@ -359,7 +361,7 @@ void WorldSession::HandleDismissCritter(WorldPacket &recvData)
     recvData >> guid;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_DISMISS_CRITTER for GUID " UI64FMTD, guid);
+    LOG_DEBUG("network", "WORLD: Received CMSG_DISMISS_CRITTER for GUID " UI64FMTD, guid);
 #endif
 
     Unit* pet = ObjectAccessor::GetCreatureOrPetOrVehicle(*_player, guid);
@@ -367,7 +369,7 @@ void WorldSession::HandleDismissCritter(WorldPacket &recvData)
     if (!pet)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "Vanitypet (guid: %u) does not exist - player '%s' (guid: %u / account: %u) attempted to dismiss it (possibly lagged out)", uint32(GUID_LOPART(guid)), GetPlayer()->GetName().c_str(), GetPlayer()->GetGUIDLow(), GetAccountId());
+        LOG_DEBUG("network", "Vanitypet (guid: %u) does not exist - player '%s' (guid: %u / account: %u) attempted to dismiss it (possibly lagged out)", uint32(GUID_LOPART(guid)), GetPlayer()->GetName().c_str(), GetPlayer()->GetGUIDLow(), GetAccountId());
 #endif
         return;
     }
@@ -450,7 +452,7 @@ void WorldSession::HandlePetStopAttack(WorldPacket &recvData)
     recvData >> guid;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_PET_STOP_ATTACK for GUID " UI64FMTD "", guid);
+    LOG_DEBUG("network", "WORLD: Received CMSG_PET_STOP_ATTACK for GUID " UI64FMTD "", guid);
 #endif
 
     Unit* pet = ObjectAccessor::GetCreatureOrPetOrVehicle(*_player, guid);
@@ -555,11 +557,11 @@ void WorldSession::HandlePetActionHelper(Unit* pet, uint64 guid1, uint16 spellid
 
                     // pussywizard:
                     if (Creature* creaturePet = pet->ToCreature())
-                        if (!creaturePet->_CanDetectFeignDeathOf(TargetUnit) || !creaturePet->CanCreatureAttack(TargetUnit) || creaturePet->isTargetNotAcceptableByMMaps(TargetUnit->GetGUID(), sWorld->GetGameTime(), TargetUnit))
+                        if (!creaturePet->_CanDetectFeignDeathOf(TargetUnit) || !creaturePet->CanCreatureAttack(TargetUnit) || creaturePet->isTargetNotAcceptableByMMaps(TargetUnit->GetGUID(), GameTime::GetGameTime(), TargetUnit))
                             return;
 
                     // Not let attack through obstructions
-                    bool checkLos = !MMAP::MMapFactory::IsPathfindingEnabled(pet->GetMap()) || 
+                    bool checkLos = !DisableMgr::IsPathfindingEnabled(pet->GetMap()) || 
                                     (TargetUnit->GetTypeId() == TYPEID_UNIT && (TargetUnit->ToCreature()->isWorldBoss() || TargetUnit->ToCreature()->IsDungeonBoss()));
 
                     if (checkLos && !pet->IsWithinLOSInMap(TargetUnit))
@@ -970,7 +972,7 @@ bool WorldSession::CheckStableMaster(uint64 guid)
         if (!GetPlayer()->IsGameMaster() && !GetPlayer()->HasAuraType(SPELL_AURA_OPEN_STABLE))
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("Player (GUID:%u) attempt open stable in cheating way.", GUID_LOPART(guid));
+            LOG_DEBUG("server", "Player (GUID:%u) attempt open stable in cheating way.", GUID_LOPART(guid));
 #endif
             return false;
         }
@@ -981,7 +983,7 @@ bool WorldSession::CheckStableMaster(uint64 guid)
         if (!GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_STABLEMASTER))
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("Stablemaster (GUID:%u) not found or you can't interact with him.", GUID_LOPART(guid));
+            LOG_DEBUG("server", "Stablemaster (GUID:%u) not found or you can't interact with him.", GUID_LOPART(guid));
 #endif
             return false;
         }
@@ -1181,7 +1183,7 @@ void WorldSession::HandlePetRename(WorldPacket & recvData)
     SQLTransaction trans = CharacterDatabase.BeginTransaction();
     if (isdeclined)
     {
-        if (sWorld->getBoolConfig(CONFIG_DECLINED_NAMES_USED))
+        if (sGameConfig->GetBoolConfig("DeclinedNames"))
         {
             PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHAR_PET_DECLINEDNAME);
             stmt->setUInt32(0, pet->GetCharmInfo()->GetPetNumber());
@@ -1205,7 +1207,7 @@ void WorldSession::HandlePetRename(WorldPacket & recvData)
 
     CharacterDatabase.CommitTransaction(trans);
 
-    pet->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(time(NULL))); // cast can't be helped
+    pet->SetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP, uint32(GameTime::GetGameTime())); // cast can't be helped
 }
 
 void WorldSession::HandlePetAbandon(WorldPacket & recvData)
@@ -1301,7 +1303,7 @@ void WorldSession::HandlePetSpellAutocastOpcode(WorldPacket& recvPacket)
 void WorldSession::HandlePetCastSpellOpcode(WorldPacket& recvPacket)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_PET_CAST_SPELL");
+    LOG_DEBUG("network", "WORLD: CMSG_PET_CAST_SPELL");
 #endif
 
     uint64 guid;
@@ -1312,7 +1314,7 @@ void WorldSession::HandlePetCastSpellOpcode(WorldPacket& recvPacket)
     recvPacket >> guid >> castCount >> spellId >> castFlags;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_PET_CAST_SPELL, guid: " UI64FMTD ", castCount: %u, spellId %u, castFlags %u", guid, castCount, spellId, castFlags);
+    LOG_DEBUG("network", "WORLD: CMSG_PET_CAST_SPELL, guid: " UI64FMTD ", castCount: %u, spellId %u, castFlags %u", guid, castCount, spellId, castFlags);
 #endif
 
     // This opcode is also sent from charmed and possessed units (players and creatures)
@@ -1422,7 +1424,7 @@ void WorldSession::SendPetNameInvalid(uint32 error, const std::string& name, Dec
 void WorldSession::HandlePetLearnTalent(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_PET_LEARN_TALENT");
+    LOG_DEBUG("network", "WORLD: CMSG_PET_LEARN_TALENT");
 #endif
 
     uint64 guid;
@@ -1436,7 +1438,7 @@ void WorldSession::HandlePetLearnTalent(WorldPacket & recvData)
 void WorldSession::HandleLearnPreviewTalentsPet(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "CMSG_LEARN_PREVIEW_TALENTS_PET");
+    LOG_DEBUG("network", "CMSG_LEARN_PREVIEW_TALENTS_PET");
 #endif
 
     uint64 guid;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -9,6 +9,7 @@
 #include "InstanceScript.h"
 #include "MoveSpline.h"
 #include "MapManager.h"
+#include "GameConfig.h"
 
 TransportTemplate::~TransportTemplate()
 {
@@ -80,6 +81,7 @@ void TransportMgr::LoadTransportTemplates()
     } while (result->NextRow());
 
     sLog->outString(">> Loaded %u transport templates in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
+    LOG_INFO("server.loading", "");
 }
 
 class SplineRawInitializer
@@ -413,7 +415,7 @@ void TransportMgr::SpawnContinentTransports()
     oldMSTime = getMSTime();
     QueryResult result;
 
-    if (sWorld->getBoolConfig(CONFIG_ENABLE_CONTINENT_TRANSPORT))
+    if (sGameConfig->GetBoolConfig("IsContinentTransport.Enabled"))
     {
         result = WorldDatabase.Query("SELECT guid, entry FROM transports");
         if (result)
@@ -434,7 +436,7 @@ void TransportMgr::SpawnContinentTransports()
 
         sLog->outString(">> Spawned %u continent motion transports in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
 
-        if (sWorld->getBoolConfig(CONFIG_ENABLE_CONTINENT_TRANSPORT_PRELOADING))
+        if (sGameConfig->GetBoolConfig("IsPreloadedContinentTransport.Enabled"))
         {
             // pussywizard: preload grids for continent static transports
             oldMSTime = getMSTime();
@@ -463,6 +465,8 @@ void TransportMgr::SpawnContinentTransports()
             sLog->outString(">> Preloaded grids for %u continent static transports in %u ms", count, GetMSTimeDiffToNow(oldMSTime));
         }
     }
+
+    sLog->outString();
 }
 
 void TransportMgr::CreateInstanceTransports(Map* map)

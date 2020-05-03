@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -21,7 +21,7 @@ namespace VMAP
     struct AreaInfo;
     struct LocationInfo;
 
-    class MeshTriangle
+    class AC_COMMON_API MeshTriangle
     {
         public:
             MeshTriangle() : idx0(0), idx1(0), idx2(0) { }
@@ -32,7 +32,7 @@ namespace VMAP
             uint32 idx2;
     };
 
-    class WmoLiquid
+    class AC_COMMON_API WmoLiquid
     {
         public:
             WmoLiquid(uint32 width, uint32 height, const G3D::Vector3 &corner, uint32 type);
@@ -46,6 +46,7 @@ namespace VMAP
             uint32 GetFileSize();
             bool writeToFile(FILE* wf);
             static bool readFromFile(FILE* rf, WmoLiquid* &liquid);
+            void getPosInfo(uint32& tilesX, uint32& tilesY, G3D::Vector3& corner) const;
         private:
             WmoLiquid(): iTilesX(0), iTilesY(0), iType(0), iHeight(0), iFlags(0) { }
             uint32 iTilesX;       //!< number of tiles in x direction, each
@@ -54,12 +55,10 @@ namespace VMAP
             uint32 iType;         //!< liquid type
             float *iHeight;       //!< (tilesX + 1)*(tilesY + 1) height values
             uint8 *iFlags;        //!< info if liquid tile is used
-        public:
-            void getPosInfo(uint32 &tilesX, uint32 &tilesY, G3D::Vector3 &corner) const;
     };
 
     /*! holding additional info for WMO group files */
-    class GroupModel
+    class AC_COMMON_API GroupModel
     {
         public:
             GroupModel(): iMogpFlags(0), iGroupWMOID(0), iLiquid(0) { }
@@ -80,6 +79,7 @@ namespace VMAP
             const G3D::AABox& GetBound() const { return iBound; }
             uint32 GetMogpFlags() const { return iMogpFlags; }
             uint32 GetWmoID() const { return iGroupWMOID; }
+            void getMeshData(std::vector<G3D::Vector3>& outVertices, std::vector<MeshTriangle>& outTriangles, WmoLiquid*& liquid);
         protected:
             G3D::AABox iBound;
             uint32 iMogpFlags;// 0x8 outdor; 0x2000 indoor
@@ -88,11 +88,10 @@ namespace VMAP
             std::vector<MeshTriangle> triangles;
             BIH meshTree;
             WmoLiquid* iLiquid;
-        public:
-            void getMeshData(std::vector<G3D::Vector3> &vertices, std::vector<MeshTriangle> &triangles, WmoLiquid* &liquid);
     };
+    
     /*! Holds a model (converted M2 or WMO) in its original coordinate space */
-    class WorldModel
+    class AC_COMMON_API WorldModel
     {
         public:
             WorldModel(): RootWMOID(0) { }
@@ -105,12 +104,11 @@ namespace VMAP
             bool GetLocationInfo(const G3D::Vector3 &p, const G3D::Vector3 &down, float &dist, LocationInfo &info) const;
             bool writeFile(const std::string &filename);
             bool readFile(const std::string &filename);
+            void getGroupModels(std::vector<GroupModel>& outGroupModels);
         protected:
             uint32 RootWMOID;
             std::vector<GroupModel> groupModels;
             BIH groupTree;
-        public:
-            void getGroupModels(std::vector<GroupModel> &groupModels);
     };
 } // namespace VMAP
 

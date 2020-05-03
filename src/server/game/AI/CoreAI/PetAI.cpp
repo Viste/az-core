@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -19,6 +19,7 @@
 #include "SpellInfo.h"
 #include "SpellAuraEffects.h"
 #include "WorldSession.h"
+#include "GameTime.h"
 
 int PetAI::Permissible(const Creature* creature)
 {
@@ -51,7 +52,7 @@ bool PetAI::_needToStop()
     if (!me->_CanDetectFeignDeathOf(me->GetVictim()))
         return true;
 
-    if (me->isTargetNotAcceptableByMMaps(me->GetVictim()->GetGUID(), sWorld->GetGameTime(), me->GetVictim()))
+    if (me->isTargetNotAcceptableByMMaps(me->GetVictim()->GetGUID(), GameTime::GetGameTime(), me->GetVictim()))
         return true;
 
     return !me->CanCreatureAttack(me->GetVictim());
@@ -62,7 +63,7 @@ void PetAI::_stopAttack()
     if (!me->IsAlive())
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outStaticDebug("Creature stoped attacking cuz his dead [guid=%u]", me->GetGUIDLow());
+        LOG_DEBUG("server", "Creature stoped attacking cuz his dead [guid=%u]", me->GetGUIDLow());
 #endif
         me->GetMotionMaster()->Clear();
         me->GetMotionMaster()->MoveIdle();
@@ -164,7 +165,7 @@ void PetAI::UpdateAI(uint32 diff)
         if (_needToStop())
         {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("Pet AI stopped attacking [guid=%u]", me->GetGUIDLow());
+            LOG_DEBUG("server", "Pet AI stopped attacking [guid=%u]", me->GetGUIDLow());
 #endif
             _stopAttack();
             return;
@@ -474,7 +475,7 @@ Unit* PetAI::SelectNextTarget(bool allowAutoSelect) const
 
     // Check pet attackers first so we don't drag a bunch of targets to the owner
     if (Unit* myAttacker = me->getAttackerForHelper())
-        if (!myAttacker->HasBreakableByDamageCrowdControlAura() && me->_CanDetectFeignDeathOf(myAttacker) && me->CanCreatureAttack(myAttacker) && !me->isTargetNotAcceptableByMMaps(myAttacker->GetGUID(), sWorld->GetGameTime(), myAttacker))
+        if (!myAttacker->HasBreakableByDamageCrowdControlAura() && me->_CanDetectFeignDeathOf(myAttacker) && me->CanCreatureAttack(myAttacker) && !me->isTargetNotAcceptableByMMaps(myAttacker->GetGUID(), GameTime::GetGameTime(), myAttacker))
             return myAttacker;
 
     // Check pet's attackers first to prevent dragging mobs back to owner
@@ -495,13 +496,13 @@ Unit* PetAI::SelectNextTarget(bool allowAutoSelect) const
 
     // Check owner attackers
     if (Unit* ownerAttacker = owner->getAttackerForHelper())
-        if (!ownerAttacker->HasBreakableByDamageCrowdControlAura() && me->_CanDetectFeignDeathOf(ownerAttacker) && me->CanCreatureAttack(ownerAttacker) && !me->isTargetNotAcceptableByMMaps(ownerAttacker->GetGUID(), sWorld->GetGameTime(), ownerAttacker))
+        if (!ownerAttacker->HasBreakableByDamageCrowdControlAura() && me->_CanDetectFeignDeathOf(ownerAttacker) && me->CanCreatureAttack(ownerAttacker) && !me->isTargetNotAcceptableByMMaps(ownerAttacker->GetGUID(), GameTime::GetGameTime(), ownerAttacker))
             return ownerAttacker;
 
     // Check owner victim
     // 3.0.2 - Pets now start attacking their owners victim in defensive mode as soon as the hunter does
     if (Unit* ownerVictim = owner->GetVictim())
-        if (me->_CanDetectFeignDeathOf(ownerVictim) && me->CanCreatureAttack(ownerVictim) && !me->isTargetNotAcceptableByMMaps(ownerVictim->GetGUID(), sWorld->GetGameTime(), ownerVictim))
+        if (me->_CanDetectFeignDeathOf(ownerVictim) && me->CanCreatureAttack(ownerVictim) && !me->isTargetNotAcceptableByMMaps(ownerVictim->GetGUID(), GameTime::GetGameTime(), ownerVictim))
             return ownerVictim;
 
     // Neither pet or owner had a target and aggressive pets can pick any target

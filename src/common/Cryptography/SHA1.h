@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -13,7 +13,7 @@
 
 class BigNumber;
 
-class SHA1Hash
+class AC_COMMON_API SHA1Hash
 {
     public:
         SHA1Hash();
@@ -34,5 +34,8 @@ class SHA1Hash
         SHA_CTX mC;
         uint8 mDigest[SHA_DIGEST_LENGTH];
 };
+
+/// Returns the SHA1 hash of the given content as hex string.
+AC_COMMON_API std::string CalculateSHA1Hash(std::string const& content);
 #endif
 

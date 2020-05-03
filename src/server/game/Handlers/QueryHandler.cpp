@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -18,6 +18,8 @@
 #include "NPCHandler.h"
 #include "Pet.h"
 #include "MapManager.h"
+#include "GameTime.h"
+#include "GameLocale.h"
 
 void WorldSession::SendNameQueryOpcode(uint64 guid)
 {
@@ -74,8 +76,8 @@ void WorldSession::HandleQueryTimeOpcode(WorldPacket & /*recvData*/)
 void WorldSession::SendQueryTimeResponse()
 {
     WorldPacket data(SMSG_QUERY_TIME_RESPONSE, 4+4);
-    data << uint32(time(NULL));
-    data << uint32(sWorld->GetNextDailyQuestsResetTime() - time(NULL));
+    data << uint32(GameTime::GetGameTime());
+    data << uint32(sWorld->GetNextDailyQuestsResetTime() - GameTime::GetGameTime());
     SendPacket(&data);
 }
 
@@ -97,10 +99,10 @@ void WorldSession::HandleCreatureQueryOpcode(WorldPacket & recvData)
         LocaleConstant loc_idx = GetSessionDbLocaleIndex();
         if (loc_idx >= 0)
         {
-            if (CreatureLocale const* cl = sObjectMgr->GetCreatureLocale(entry))
+            if (CreatureLocale const* cl = sGameLocale->GetCreatureLocale(entry))
             {
-                ObjectMgr::GetLocaleString(cl->Name, loc_idx, Name);
-                ObjectMgr::GetLocaleString(cl->Title, loc_idx, Title);
+                sGameLocale->GetLocaleString(cl->Name, loc_idx, Name);
+                sGameLocale->GetLocaleString(cl->Title, loc_idx, Title);
             }
         }
                                                             // guess size
@@ -138,13 +140,13 @@ void WorldSession::HandleCreatureQueryOpcode(WorldPacket & recvData)
     else
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_CREATURE_QUERY - NO CREATURE INFO! (GUID: %u, ENTRY: %u)", GUID_LOPART(guid), entry);
+        LOG_DEBUG("network", "WORLD: CMSG_CREATURE_QUERY - NO CREATURE INFO! (GUID: %u, ENTRY: %u)", GUID_LOPART(guid), entry);
 #endif
         WorldPacket data(SMSG_CREATURE_QUERY_RESPONSE, 4);
         data << uint32(entry | 0x80000000);
         SendPacket(&data);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Sent SMSG_CREATURE_QUERY_RESPONSE");
+        LOG_DEBUG("network", "WORLD: Sent SMSG_CREATURE_QUERY_RESPONSE");
 #endif
     }
 }
@@ -170,14 +172,14 @@ void WorldSession::HandleGameObjectQueryOpcode(WorldPacket & recvData)
         
         LocaleConstant localeConstant = GetSessionDbLocaleIndex();
         if (localeConstant >= LOCALE_enUS)
-            if (GameObjectLocale const* gameObjectLocale = sObjectMgr->GetGameObjectLocale(entry))
+            if (GameObjectLocale const* gameObjectLocale = sGameLocale->GetGameObjectLocale(entry))
             {
-                ObjectMgr::GetLocaleString(gameObjectLocale->Name, localeConstant, Name);
-                ObjectMgr::GetLocaleString(gameObjectLocale->CastBarCaption, localeConstant, CastBarCaption);
+                sGameLocale->GetLocaleString(gameObjectLocale->Name, localeConstant, Name);
+                sGameLocale->GetLocaleString(gameObjectLocale->CastBarCaption, localeConstant, CastBarCaption);
             }
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_GAMEOBJECT_QUERY '%s' - Entry: %u. ", info->name.c_str(), entry);
+        LOG_DEBUG("network", "WORLD: CMSG_GAMEOBJECT_QUERY '%s' - Entry: %u. ", info->name.c_str(), entry);
 #endif
         WorldPacket data (SMSG_GAMEOBJECT_QUERY_RESPONSE, 150);
         data << uint32(entry);
@@ -201,20 +203,20 @@ void WorldSession::HandleGameObjectQueryOpcode(WorldPacket & recvData)
 
         SendPacket(&data);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Sent SMSG_GAMEOBJECT_QUERY_RESPONSE");
+        LOG_DEBUG("network", "WORLD: Sent SMSG_GAMEOBJECT_QUERY_RESPONSE");
 #endif
     }
     else
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_GAMEOBJECT_QUERY - Missing gameobject info for (GUID: %u, ENTRY: %u)",
+        LOG_DEBUG("network", "WORLD: CMSG_GAMEOBJECT_QUERY - Missing gameobject info for (GUID: %u, ENTRY: %u)",
            GUID_LOPART(guid), entry);
 #endif
         WorldPacket data (SMSG_GAMEOBJECT_QUERY_RESPONSE, 4);
         data << uint32(entry | 0x80000000);
         SendPacket(&data);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Sent SMSG_GAMEOBJECT_QUERY_RESPONSE");
+        LOG_DEBUG("network", "WORLD: Sent SMSG_GAMEOBJECT_QUERY_RESPONSE");
 #endif
     }
 }
@@ -222,7 +224,7 @@ void WorldSession::HandleGameObjectQueryOpcode(WorldPacket & recvData)
 void WorldSession::HandleCorpseQueryOpcode(WorldPacket & /*recvData*/)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received MSG_CORPSE_QUERY");
+    LOG_DEBUG("network", "WORLD: Received MSG_CORPSE_QUERY");
 #endif
 
     Corpse* corpse = GetPlayer()->GetCorpse();
@@ -279,7 +281,7 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recvData)
 
     recvData >> textID;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: CMSG_NPC_TEXT_QUERY TextId: %u", textID);
+    LOG_DEBUG("network", "WORLD: CMSG_NPC_TEXT_QUERY TextId: %u", textID);
 #endif
 
     recvData >> guid;
@@ -312,7 +314,7 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recvData)
 
         for (uint8 i = 0; i < MAX_GOSSIP_TEXT_OPTIONS; ++i)
         {
-            BroadcastText const* bct = sObjectMgr->GetBroadcastText(gossip->Options[i].BroadcastTextID);
+            BroadcastText const* bct = sGameLocale->GetBroadcastText(gossip->Options[i].BroadcastTextID);
             if (bct)
             {
                 text0[i] = bct->GetText(locale, GENDER_MALE, true);
@@ -326,10 +328,10 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recvData)
 
             if (locale != DEFAULT_LOCALE && !bct)
             {
-                if (NpcTextLocale const* npcTextLocale = sObjectMgr->GetNpcTextLocale(textID))
+                if (NpcTextLocale const* npcTextLocale = sGameLocale->GetNpcTextLocale(textID))
                 {
-                    ObjectMgr::GetLocaleString(npcTextLocale->Text_0[i], locale, text0[i]);
-                    ObjectMgr::GetLocaleString(npcTextLocale->Text_1[i], locale, text1[i]);
+                    sGameLocale->GetLocaleString(npcTextLocale->Text_0[i], locale, text0[i]);
+                    sGameLocale->GetLocaleString(npcTextLocale->Text_1[i], locale, text1[i]);
                 }
             }
 
@@ -358,7 +360,7 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recvData)
     SendPacket(&data);
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Sent SMSG_NPC_TEXT_UPDATE");
+    LOG_DEBUG("network", "WORLD: Sent SMSG_NPC_TEXT_UPDATE");
 #endif
 }
 
@@ -366,7 +368,7 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket & recvData)
 void WorldSession::HandlePageTextQueryOpcode(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_PAGE_TEXT_QUERY");
+    LOG_DEBUG("network", "WORLD: Received CMSG_PAGE_TEXT_QUERY");
 #endif
 
     uint32 pageID;
@@ -392,8 +394,8 @@ void WorldSession::HandlePageTextQueryOpcode(WorldPacket & recvData)
             
             int loc_idx = GetSessionDbLocaleIndex();
             if (loc_idx >= 0)
-                if (PageTextLocale const* player = sObjectMgr->GetPageTextLocale(pageID))
-                    ObjectMgr::GetLocaleString(player->Text, loc_idx, Text);
+                if (PageTextLocale const* player = sGameLocale->GetPageTextLocale(pageID))
+                    sGameLocale->GetLocaleString(player->Text, loc_idx, Text);
             
             data << Text;
             data << uint32(pageText->NextPage);
@@ -402,7 +404,7 @@ void WorldSession::HandlePageTextQueryOpcode(WorldPacket & recvData)
         SendPacket(&data);
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Sent SMSG_PAGE_TEXT_QUERY_RESPONSE");
+        LOG_DEBUG("network", "WORLD: Sent SMSG_PAGE_TEXT_QUERY_RESPONSE");
 #endif
     }
 }
@@ -410,7 +412,7 @@ void WorldSession::HandlePageTextQueryOpcode(WorldPacket & recvData)
 void WorldSession::HandleCorpseMapPositionQuery(WorldPacket & recvData)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Recv CMSG_CORPSE_MAP_POSITION_QUERY");
+    LOG_DEBUG("network", "WORLD: Recv CMSG_CORPSE_MAP_POSITION_QUERY");
 #endif
 
     uint32 unk;

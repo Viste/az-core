@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -229,14 +229,6 @@ struct AchievementReward
 
 typedef std::map<uint32, AchievementReward> AchievementRewards;
 
-struct AchievementRewardLocale
-{
-    StringVector Subject;
-    StringVector Text;
-};
-
-typedef std::map<uint32, AchievementRewardLocale> AchievementRewardLocales;
-
 struct CompletedAchievementData
 {
     time_t date;
@@ -345,12 +337,6 @@ class AchievementGlobalMgr
             return iter != m_achievementRewards.end() ? &iter->second : NULL;
         }
 
-        AchievementRewardLocale const* GetAchievementRewardLocale(AchievementEntry const* achievement) const
-        {
-            AchievementRewardLocales::const_iterator iter = m_achievementRewardLocales.find(achievement->ID);
-            return iter != m_achievementRewardLocales.end() ? &iter->second : NULL;
-        }
-
         AchievementCriteriaDataSet const* GetCriteriaDataSet(AchievementCriteriaEntry const* achievementCriteria) const
         {
             AchievementCriteriaDataMap::const_iterator iter = m_criteriaDataMap.find(achievementCriteria->ID);
@@ -365,7 +351,6 @@ class AchievementGlobalMgr
         void LoadAchievementReferenceList();
         void LoadCompletedAchievements();
         void LoadRewards();
-        void LoadRewardLocales();
     private:
         AchievementCriteriaDataMap m_criteriaDataMap;
 
@@ -381,7 +366,6 @@ class AchievementGlobalMgr
         AllCompletedAchievements m_allCompletedAchievements;
 
         AchievementRewards m_achievementRewards;
-        AchievementRewardLocales m_achievementRewardLocales;
 
         // pussywizard:
         std::map<uint32, AchievementCriteriaEntryList> m_SpecialList[ACHIEVEMENT_CRITERIA_TYPE_TOTAL];

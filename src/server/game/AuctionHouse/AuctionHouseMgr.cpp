@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -17,10 +17,13 @@
 #include "AuctionHouseMgr.h"
 #include "Item.h"
 #include "Language.h"
-#include "Logging/Log.h"
-#include <vector>
+#include "Log.h"
 #include "AvgDiffTracker.h"
 #include "AsyncAuctionListing.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
+#include <vector>
 
 enum eAuctionHouse
 {
@@ -45,7 +48,7 @@ AuctionHouseMgr* AuctionHouseMgr::instance()
 
 AuctionHouseObject* AuctionHouseMgr::GetAuctionsMap(uint32 factionTemplateId)
 {
-    if (sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_AUCTION))
+    if (sGameConfig->GetBoolConfig("AllowTwoSide.Interaction.Auction"))
         return &mNeutralAuctions;
 
     // team have linked auction houses
@@ -65,21 +68,21 @@ uint32 AuctionHouseMgr::GetAuctionDeposit(AuctionHouseEntry const* entry, uint32
     uint32 MSV = pItem->GetTemplate()->SellPrice;
 
     if (MSV <= 0)
-        return AH_MINIMUM_DEPOSIT * sWorld->getRate(RATE_AUCTION_DEPOSIT);
+        return AH_MINIMUM_DEPOSIT * sGameConfig->GetFloatConfig("Rate.Auction.Deposit");
 
     float multiplier = CalculatePct(float(entry->depositPercent), 3);
     uint32 timeHr = (((time / 60) / 60) / 12);
-    uint32 deposit = uint32(((multiplier * MSV * count / 3) * timeHr * 3) * sWorld->getRate(RATE_AUCTION_DEPOSIT));
+    uint32 deposit = uint32(((multiplier * MSV * count / 3) * timeHr * 3) * sGameConfig->GetFloatConfig("Rate.Auction.Deposit"));
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_AUCTIONHOUSE, "MSV:        %u", MSV);
-    sLog->outDebug(LOG_FILTER_AUCTIONHOUSE, "Items:      %u", count);
-    sLog->outDebug(LOG_FILTER_AUCTIONHOUSE, "Multiplier: %f", multiplier);
-    sLog->outDebug(LOG_FILTER_AUCTIONHOUSE, "Deposit:    %u", deposit);
+    LOG_DEBUG("auctionHouse", "MSV:        %u", MSV);
+    LOG_DEBUG("auctionHouse", "Items:      %u", count);
+    LOG_DEBUG("auctionHouse", "Multiplier: %f", multiplier);
+    LOG_DEBUG("auctionHouse", "Deposit:    %u", deposit);
 #endif
 
-    if (deposit < AH_MINIMUM_DEPOSIT * sWorld->getRate(RATE_AUCTION_DEPOSIT))
-        return AH_MINIMUM_DEPOSIT * sWorld->getRate(RATE_AUCTION_DEPOSIT);
+    if (deposit < AH_MINIMUM_DEPOSIT * sGameConfig->GetFloatConfig("Rate.Auction.Deposit"))
+        return AH_MINIMUM_DEPOSIT * sGameConfig->GetFloatConfig("Rate.Auction.Deposit");
     else
         return deposit;
 }
@@ -170,7 +173,7 @@ void AuctionHouseMgr::SendAuctionSuccessfulMail(AuctionEntry* auction, SQLTransa
         if (sendMail) // can be changed in the hook
             MailDraft(auction->BuildAuctionMailSubject(AUCTION_SUCCESSFUL), AuctionEntry::BuildAuctionMailBody(auction->bidder, auction->bid, auction->buyout, auction->deposit, auction->GetAuctionCut()))
                 .AddMoney(profit)
-                .SendMailTo(trans, MailReceiver(owner, auction->owner), auction, MAIL_CHECK_MASK_COPIED, sWorld->getIntConfig(CONFIG_MAIL_DELIVERY_DELAY));
+                .SendMailTo(trans, MailReceiver(owner, auction->owner), auction, MAIL_CHECK_MASK_COPIED, sGameConfig->GetIntConfig("MailDeliveryDelay"));
 
         if (auction->bid >= 500*GOLD)
             if (const GlobalPlayerData* gpd = sWorld->GetGlobalPlayerData(auction->bidder))
@@ -397,7 +400,7 @@ AuctionHouseEntry const* AuctionHouseMgr::GetAuctionHouseEntry(uint32 factionTem
 {
     uint32 houseid = 7; // goblin auction house
 
-    if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_AUCTION))
+    if (!sGameConfig->GetBoolConfig("AllowTwoSide.Interaction.Auction"))
     {
         //FIXME: found way for proper auctionhouse selection by another way
         // AuctionHouse.dbc have faction field with _player_ factions associated with auction house races.
@@ -456,7 +459,7 @@ bool AuctionHouseObject::RemoveAuction(AuctionEntry* auction)
 
 void AuctionHouseObject::Update()
 {
-    time_t checkTime = sWorld->GetGameTime() + 60;
+    time_t checkTime = GameTime::GetGameTime() + 60;
     ///- Handle expired auctions
 
     // If storage is empty, no need to update. next == NULL in this case.
@@ -554,7 +557,7 @@ bool AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
         return true;
     }
 
-    time_t curTime = sWorld->GetGameTime();
+    time_t curTime = GameTime::GetGameTime();
 
     int loc_idx = player->GetSession()->GetSessionDbLocaleIndex();
     int locdbc_idx = player->GetSession()->GetSessionDbcLocale();
@@ -563,7 +566,7 @@ bool AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
     {
         if (AsyncAuctionListingMgr::IsAuctionListingAllowed() == false) // pussywizard: World::Update is waiting for us...
             if ((itrcounter++) % 100 == 0) // check condition every 100 iterations
-                if (avgDiffTracker.getAverage() >= 30 || getMSTimeDiff(World::GetGameTimeMS(), getMSTime()) >= 10) // pussywizard: stop immediately if diff is high or waiting too long
+                if (avgDiffTracker.getAverage() >= 30 || getMSTimeDiff(GameTime::GetGameTimeMS(), getMSTime()) >= 10) // pussywizard: stop immediately if diff is high or waiting too long
                     return false;
 
         AuctionEntry* Aentry = itr->second;
@@ -616,8 +619,8 @@ bool AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
 
             // local name
             if (loc_idx >= 0)
-                if (ItemLocale const* il = sObjectMgr->GetItemLocale(proto->ItemId))
-                    ObjectMgr::GetLocaleString(il->Name, loc_idx, name);
+                if (ItemLocale const* il = sGameLocale->GetItemLocale(proto->ItemId))
+                    sGameLocale->GetLocaleString(il->Name, loc_idx, name);
 
             // DO NOT use GetItemEnchantMod(proto->RandomProperty) as it may return a result
             //  that matches the search but it may not equal item->GetItemRandomPropertyId()
@@ -701,7 +704,7 @@ bool AuctionEntry::BuildAuctionInfo(WorldPacket& data) const
     data << uint32(bid ? GetAuctionOutBid() : 0);
     // Minimal outbid
     data << uint32(buyout);                                         // Auction->buyout
-    data << uint32((expire_time - time(NULL)) * IN_MILLISECONDS);   // time left
+    data << uint32((expire_time - GameTime::GetGameTime()) * IN_MILLISECONDS);   // time left
     data << uint64(bidder);                                         // auction->bidder current
     data << uint32(bid);                                            // current bid
     return true;
@@ -709,7 +712,7 @@ bool AuctionEntry::BuildAuctionInfo(WorldPacket& data) const
 
 uint32 AuctionEntry::GetAuctionCut() const
 {
-    int32 cut = int32(CalculatePct(bid, auctionHouseEntry->cutPercent) * sWorld->getRate(RATE_AUCTION_CUT));
+    int32 cut = int32(CalculatePct(bid, auctionHouseEntry->cutPercent) * sGameConfig->GetFloatConfig("Rate.Auction.Cut"));
     return std::max(cut, 0);
 }
 

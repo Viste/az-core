@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -108,7 +108,6 @@
 
 #define I32FMT "%08I32X"
 #define I64FMT "%016I64X"
-#define snprintf _snprintf
 #define atoll _atoi64
 #define vsnprintf _vsnprintf
 #define llabs _abs64
@@ -131,6 +130,8 @@ inline bool myisfinite(float f) { return isfinite(f) && !isnan(f); }
 #define atol(a) strtoul( a, NULL, 10)
 
 #define STRINGIZE(a) #a
+
+#define MAX_NETCLIENT_PACKET_SIZE (32767 - 1)               // Client hardcap: int16 with trailing zero space otherwise crash on memory free
 
 enum TimeConstants
 {
@@ -171,10 +172,10 @@ const uint8 TOTAL_LOCALES = 9;
 #define MAX_LOCALES 8
 #define MAX_ACCOUNT_TUTORIAL_VALUES 8
 
-extern char const* localeNames[TOTAL_LOCALES];
+extern AC_COMMON_API char const* localeNames[TOTAL_LOCALES];
 
-LocaleConstant GetLocaleByName(const std::string& name);
-void CleanStringForMysqlQuery(std::string& str);
+AC_COMMON_API LocaleConstant GetLocaleByName(const std::string& name);
+AC_COMMON_API void CleanStringForMysqlQuery(std::string& str);
 
 typedef std::vector<std::string> StringVector;
 

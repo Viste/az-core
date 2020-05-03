@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -35,6 +35,11 @@
 #include "WardenMac.h"
 #include "SavingSystem.h"
 #include "AccountMgr.h"
+#include "MoveSpline.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+#include "GameLocale.h"
+
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
@@ -113,7 +118,8 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     recruiterId(recruiter),
     isRecruiter(isARecruiter),
     m_currentBankerGUID(0),
-    timeWhoCommandAllowed(0)
+    timerGsSpam(0),
+    _calendarEventCreationCooldown(0)
 {
     memset(m_Tutorials, 0, sizeof(m_Tutorials));
 
@@ -198,13 +204,13 @@ void WorldSession::SendPacket(WorldPacket const* packet)
     static uint64 sendPacketCount = 0;
     static uint64 sendPacketBytes = 0;
 
-    static time_t firstTime = time(NULL);
+    static time_t firstTime = GameTime::GetGameTime();
     static time_t lastTime = firstTime;                     // next 60 secs start time
 
     static uint64 sendLastPacketCount = 0;
     static uint64 sendLastPacketBytes = 0;
 
-    time_t cur_time = time(NULL);
+    time_t cur_time = GameTime::GetGameTime();
 
     if ((cur_time - lastTime) < 60)
     {
@@ -255,7 +261,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
         /// If necessary, kick the player because the client didn't send anything for too long
         /// (or they've been idling in character select)
-        if (sWorld->getBoolConfig(CONFIG_CLOSE_IDLE_CONNECTIONS) && IsConnectionIdle() && m_Socket)
+        if (sGameConfig->GetBoolConfig("CloseIdleConnections") && IsConnectionIdle() && m_Socket)
             m_Socket->CloseSocket("Client didn't send anything for too long");
     }
 
@@ -267,7 +273,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
     bool deletePacket = true;
     WorldPacket* firstDelayedPacket = NULL;
     uint32 processedPackets = 0;
-    time_t currentTime = time(nullptr);
+    time_t currentTime = GameTime::GetGameTime();
 
     while (m_Socket && !m_Socket->IsClosed() && !_recvQueue.empty() && _recvQueue.peek(true) != firstDelayedPacket && _recvQueue.next(packet, updater))
     {
@@ -301,7 +307,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                                 QueuePacket(packet);
                             }*/
                         }
-                        else if (_player->IsInWorld() && AntiDOS.EvaluateOpcode(*packet, currentTime))
+                        else if (AntiDOS.EvaluateOpcode(*packet, currentTime))
                         {
                             if (movementPacket)
                             {
@@ -325,12 +331,16 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                                 delete movementPacket;
                                 movementPacket = NULL;
                             }
-                            sScriptMgr->OnPacketReceive(this, *packet);
-                            #ifdef ELUNA
-                            if (!sEluna->OnPacketReceive(this, *packet))
-                                break;
-                            #endif
-                            (this->*opHandle.handler)(*packet);
+
+                            if (AntiDOS.EvaluateOpcode(*packet, currentTime))
+                            {
+                                sScriptMgr->OnPacketReceive(this, *packet);
+#ifdef ELUNA
+                                if (!sEluna->OnPacketReceive(this, *packet))
+                                    break;
+#endif
+                                (this->*opHandle.handler)(*packet);
+                            }
                         }
                         break;
                     case STATUS_AUTHED:
@@ -340,10 +350,10 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
                         if (AntiDOS.EvaluateOpcode(*packet, currentTime))
                         {
                             sScriptMgr->OnPacketReceive(this, *packet);
-                            #ifdef ELUNA
+#ifdef ELUNA
                             if (!sEluna->OnPacketReceive(this, *packet))
                                 break;
-                            #endif
+#endif
                             (this->*opHandle.handler)(*packet);
                         }
                         break;
@@ -356,9 +366,9 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
             catch (ByteBufferException const&)
             {
                 sLog->outError("WorldSession::Update ByteBufferException occured while parsing a packet (opcode: %u) from client %s, accountid=%i. Skipped packet.", packet->GetOpcode(), GetRemoteAddress().c_str(), GetAccountId());
-                if (sLog->IsOutDebug())
+                if (sLog->ShouldLog("network", LOG_LEVEL_DEBUG))
                 {
-                    sLog->outDebug(LOG_FILTER_NETWORKIO, "Dumping error causing packet:");
+                    LOG_DEBUG("network", "Dumping error causing packet:");
                     packet->hexlike();
                 }
             }
@@ -369,7 +379,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
         deletePacket = true;
 
-        if (++processedPackets >= 150) // limit (by count) packets processed in one update, prevent DDoS
+        if (++processedPackets >= 100) // limit (by count) packets processed in one update, prevent DDoS
             break;
 
         if (getMSTimeDiff(_startMSTime, getMSTime()) >= 3) // limit (by time) packets processed in one update, prevent DDoS
@@ -388,7 +398,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 
     if (updater.ProcessLogout())
     {
-        time_t currTime = time(NULL);
+        time_t currTime = GameTime::GetGameTime();
         if (ShouldLogOut(currTime) && !m_playerLoading)
             LogoutPlayer(true);
 
@@ -425,16 +435,16 @@ void WorldSession::HandleTeleportTimeout(bool updateInSessions)
     // pussywizard: handle teleport ack timeout
     if (m_Socket && !m_Socket->IsClosed() && GetPlayer() && GetPlayer()->IsBeingTeleported())
     {
-        time_t currTime = time(NULL);
+        time_t currTime = GameTime::GetGameTime();
         if (updateInSessions) // session update from World::UpdateSessions
         {
-            if (GetPlayer()->IsBeingTeleportedFar() && GetPlayer()->GetSemaphoreTeleportFar() + sWorld->getIntConfig(CONFIG_TELEPORT_TIMEOUT_FAR) < currTime)
+            if (GetPlayer()->IsBeingTeleportedFar() && GetPlayer()->GetSemaphoreTeleportFar()+sGameConfig->GetIntConfig("TeleportTimeoutFar") < currTime)
                 while (GetPlayer() && GetPlayer()->IsBeingTeleportedFar())
                     HandleMoveWorldportAckOpcode();
         }
         else // session update from Map::Update
         {
-            if (GetPlayer()->IsBeingTeleportedNear() && GetPlayer()->GetSemaphoreTeleportNear() + sWorld->getIntConfig(CONFIG_TELEPORT_TIMEOUT_NEAR) < currTime)
+            if (GetPlayer()->IsBeingTeleportedNear() && GetPlayer()->GetSemaphoreTeleportNear()+sGameConfig->GetIntConfig("TeleportTimeoutNear") < currTime)
                 while (GetPlayer() && GetPlayer()->IsInWorld() && GetPlayer()->IsBeingTeleportedNear())
                 {
                     Player* plMover = GetPlayer()->m_mover->ToPlayer();
@@ -504,7 +514,7 @@ void WorldSession::LogoutPlayer(bool save)
                 _player->RemoveBattlegroundQueueId(bgQueueTypeId);
                 sBattlegroundMgr->GetBattlegroundQueue(bgQueueTypeId).RemovePlayer(_player->GetGUID(), false, i);
                 // track if player logs out after invited to join BG
-                if (_player->IsInvitedForBattlegroundInstance() && sWorld->getBoolConfig(CONFIG_BATTLEGROUND_TRACK_DESERTERS))
+                if(_player->IsInvitedForBattlegroundInstance() && sGameConfig->GetBoolConfig("Battleground.TrackDeserters.Enable"))
                 {
                     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_DESERTER_TRACK);
                     stmt->setUInt32(0, _player->GetGUIDLow());
@@ -601,7 +611,7 @@ void WorldSession::LogoutPlayer(bool save)
         WorldPacket data(SMSG_LOGOUT_COMPLETE, 0);
         SendPacket(&data);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "SESSION: Sent SMSG_LOGOUT_COMPLETE Message");
+        LOG_DEBUG("network", "SESSION: Sent SMSG_LOGOUT_COMPLETE Message");
 #endif
 
         //! Since each account can only have one online character at any given time, ensure all characters for active account are marked as offline
@@ -662,7 +672,7 @@ void WorldSession::SendNotification(uint32 string_id, ...)
 
 char const* WorldSession::GetAcoreString(uint32 entry) const
 {
-    return sObjectMgr->GetAcoreString(entry, GetSessionDbLocaleIndex());
+    return sGameLocale->GetAcoreString(entry, GetSessionDbLocaleIndex());
 }
 
 void WorldSession::Handle_NULL(WorldPacket& recvPacket)
@@ -773,7 +783,7 @@ void WorldSession::SetAccountData(AccountDataType type, time_t tm, std::string c
 void WorldSession::SendAccountDataTimes(uint32 mask)
 {
     WorldPacket data(SMSG_ACCOUNT_DATA_TIMES, 4 + 1 + 4 + 8 * 4); // changed in WotLK
-    data << uint32(time(NULL));                             // unix time of something
+    data << uint32(GameTime::GetGameTime());                             // unix time of something
     data << uint8(1);
     data << uint32(mask);                                   // type mask
     for (uint32 i = 0; i < NUM_ACCOUNT_DATA_TYPES; ++i)
@@ -864,7 +874,7 @@ void WorldSession::ReadMovementInfo(WorldPacket &data, MovementInfo* mi)
     { \
         if (check) \
         { \
-            sLog->outDebug(LOG_FILTER_UNITS, "WorldSession::ReadMovementInfo: Violation of MovementFlags found (%s). " \
+            LOG_DEBUG("entities.units", "WorldSession::ReadMovementInfo: Violation of MovementFlags found (%s). " \
                 "MovementFlags: %u, MovementFlags2: %u for player GUID: %u. Mask %u will be removed.", \
                 STRINGIZE(check), mi->GetMovementFlags(), mi->GetExtraMovementFlags(), GetPlayer()->GetGUIDLow(), maskToRemove); \
             mi->RemoveMovementFlag((maskToRemove)); \
@@ -936,7 +946,9 @@ void WorldSession::ReadMovementInfo(WorldPacket &data, MovementInfo* mi)
     REMOVE_VIOLATING_FLAGS(mi->HasMovementFlag(MOVEMENTFLAG_SPLINE_ENABLED) &&
         (!GetPlayer()->movespline->Initialized() || GetPlayer()->movespline->Finalized()), MOVEMENTFLAG_SPLINE_ENABLED);
 
-#undef REMOVE_VIOLATING_FLAGS
+    REMOVE_VIOLATING_FLAGS(mi->HasMovementFlag(MOVEMENTFLAG_SPLINE_ENABLED) &&
+        (!GetPlayer()->movespline->Initialized() || GetPlayer()->movespline->Finalized()), MOVEMENTFLAG_SPLINE_ENABLED);
+    #undef REMOVE_VIOLATING_FLAGS
 }
 
 void WorldSession::WriteMovementInfo(WorldPacket* data, MovementInfo* mi)
@@ -1058,12 +1070,12 @@ void WorldSession::ReadAddonsInfo(WorldPacket &data)
         uint32 currentTime;
         addonInfo >> currentTime;
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_NETWORKIO, "ADDON: CurrentTime: %u", currentTime);
+        LOG_DEBUG("network", "ADDON: CurrentTime: %u", currentTime);
 #endif
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
         if (addonInfo.rpos() != addonInfo.size())
-            sLog->outDebug(LOG_FILTER_NETWORKIO, "packet under-read!");
+            LOG_DEBUG("network", "packet under-read!");
 #endif
     }
     else
@@ -1336,6 +1348,27 @@ void WorldSession::InitWarden(BigNumber* k, std::string const& os)
     }
 }
 
+void WorldSession::UpdateTimeOutTime(uint32 diff)
+{
+    if (time_t(diff) > m_timeOutTime)
+        m_timeOutTime = 0;
+    else
+        m_timeOutTime -= diff;
+}
+
+void WorldSession::ResetTimeOutTime(bool onlyActive)
+{
+    if (GetPlayer())
+        m_timeOutTime = int32(sGameConfig->GetIntConfig("SocketTimeOutTimeActive"));
+    else if (!onlyActive)
+        m_timeOutTime = int32(sGameConfig->GetIntConfig("SocketTimeOutTime"));
+}
+
+bool WorldSession::IsConnectionIdle() const
+{
+    return (m_timeOutTime <= 0 && !m_inQueue);
+}
+
 bool WorldSession::DosProtection::EvaluateOpcode(WorldPacket& p, time_t time) const
 {
     uint32 maxPacketCounterAllowed = GetMaxPacketCounterAllowed(p.GetOpcode());
@@ -1354,10 +1387,10 @@ bool WorldSession::DosProtection::EvaluateOpcode(WorldPacket& p, time_t time) co
     // Check if player is flooding some packets
     if (++packetCounter.amountCounter <= maxPacketCounterAllowed)
         return true;
-
-    sLog->outString("AntiDOS: Account %u, IP: %s, Ping: %u, Character %s, flooding packet (opc: %s (0x%X), count: %u)",
-        Session->GetAccountId(), Session->GetRemoteAddress().c_str(), Session->GetLatency(),
-        Session->GetPlayerName().c_str(), opcodeTable[p.GetOpcode()].name, p.GetOpcode(), packetCounter.amountCounter);
+    
+    LOG_WARN("network", "AntiDOS: Account %u, IP: %s, Ping: %u, Character: %s, flooding packet (opc: %s (0x%X), count: %u)",
+        Session->GetAccountId(), Session->GetRemoteAddress().c_str(), Session->GetLatency(), Session->GetPlayerName().c_str(),
+        opcodeTable[p.GetOpcode()].name, p.GetOpcode(), packetCounter.amountCounter);
 
     switch (_policy)
     {
@@ -1365,28 +1398,33 @@ bool WorldSession::DosProtection::EvaluateOpcode(WorldPacket& p, time_t time) co
             return true;
         case POLICY_KICK:
         {
-            sLog->outString("AntiDOS: Player %s kicked!", Session->GetPlayerName().c_str());
+            sLog->outError("AntiDOS: Player kicked!");
             Session->KickPlayer();
             return false;
         }
         case POLICY_BAN:
         {
-            uint32 bm = sWorld->getIntConfig(CONFIG_PACKET_SPOOF_BANMODE);
-            uint32 duration = sWorld->getIntConfig(CONFIG_PACKET_SPOOF_BANDURATION); // in seconds
+            uint32 bm = sGameConfig->GetIntConfig("PacketSpoof.BanMode");
+            int64 duration = sGameConfig->GetIntConfig("PacketSpoof.BanDuration"); // in seconds
             std::string nameOrIp = "";
             switch (bm)
             {
-                case 0: // Ban account
-                    (void)AccountMgr::GetName(Session->GetAccountId(), nameOrIp);
-                    sBan->BanAccount(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutoDOS");
-                    break;
-                case 1: // Ban ip
-                    nameOrIp = Session->GetRemoteAddress();
-                    sBan->BanIP(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutoDOS");
-                    break;
+            case 0:
+            {
+                AccountMgr::GetName(Session->GetAccountId(), nameOrIp);
+                sBan->BanAccount(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutiDOS");
+                break;
+            }
+            case 2:
+            {
+                nameOrIp = Session->GetRemoteAddress();
+                sBan->BanIP(nameOrIp, std::to_string(duration), "DOS (Packet Flooding/Spoofing", "Server: AutiDOS");
+                break;
+            }
             }
 
-            sLog->outString("AntiDOS: Player automatically banned for %u seconds.", duration);
+            LOG_WARN("network", "AntiDOS: Player automatically banned for %u seconds.", static_cast<uint32>(duration));
+            Session->KickPlayer();
             return false;
         }
         default: // invalid policy
@@ -1397,6 +1435,7 @@ bool WorldSession::DosProtection::EvaluateOpcode(WorldPacket& p, time_t time) co
 uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) const
 {
     uint32 maxPacketCounterAllowed;
+
     switch (opcode)
     {
         // CPU usage sending 2000 packets/second on a 3.70 GHz 4 cores on Win x64
@@ -1480,7 +1519,15 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
         case MSG_RANDOM_ROLL:                           // not profiled
         case CMSG_TIME_SYNC_RESP:                       // not profiled
         case CMSG_TRAINER_BUY_SPELL:                    // not profiled
+        case CMSG_FORCE_SWIM_SPEED_CHANGE_ACK:          // not profiled
+        case CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK:     // not profiled
         case CMSG_FORCE_RUN_SPEED_CHANGE_ACK:           // not profiled
+        case CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK:      // not profiled
+        case CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK:        // not profiled
+        case CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK:   // not profiled
+        case CMSG_FORCE_WALK_SPEED_CHANGE_ACK:          // not profiled
+        case CMSG_FORCE_TURN_RATE_CHANGE_ACK:           // not profiled
+        case CMSG_FORCE_PITCH_RATE_CHANGE_ACK:          // not profiled
         {
             // "0" is a magic number meaning there's no limit for the opcode.
             // All the opcodes above must cause little CPU usage and no sync/async database queries at all
@@ -1549,6 +1596,7 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
         case CMSG_GROUP_SET_LEADER:                     //   1               2         1 async db query
         case CMSG_GROUP_RAID_CONVERT:                   //   1               5         1 async db query
         case CMSG_GROUP_ASSISTANT_LEADER:               //   1               2         1 async db query
+        case CMSG_CALENDAR_ADD_EVENT:                   //  21              10         2 async db query
         case CMSG_PETITION_BUY:                         // not profiled                1 sync 1 async db queries
         case CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE:   // not profiled
         case CMSG_REQUEST_VEHICLE_PREV_SEAT:            // not profiled
@@ -1560,6 +1608,13 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
         case CMSG_SOCKET_GEMS:                          // not profiled
         case CMSG_WRAP_ITEM:                            // not profiled
         case CMSG_REPORT_PVP_AFK:                       // not profiled
+        case CMSG_AUCTION_LIST_BIDDER_ITEMS:
+        case CMSG_AUCTION_LIST_ITEMS:
+        case CMSG_AUCTION_LIST_OWNER_ITEMS:
+        case CMSG_AUCTION_LIST_PENDING_SALES:
+        case CMSG_AUCTION_PLACE_BID:
+        case CMSG_AUCTION_REMOVE_ITEM:
+        case CMSG_AUCTION_SELL_ITEM:
         {
             maxPacketCounterAllowed = 10;
             break;
@@ -1571,7 +1626,6 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
         case CMSG_GMTICKET_UPDATETEXT:                  //   0              15         1 async db query
         case CMSG_GMTICKET_DELETETICKET:                //   1              25         1 async db query
         case CMSG_GMRESPONSE_RESOLVE:                   //   1              25         1 async db query
-        case CMSG_CALENDAR_ADD_EVENT:                   //  21              10         2 async db query
         case CMSG_CALENDAR_UPDATE_EVENT:                // not profiled
         case CMSG_CALENDAR_REMOVE_EVENT:                // not profiled
         case CMSG_CALENDAR_COPY_EVENT:                  // not profiled
@@ -1611,6 +1665,7 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
         case MSG_SET_RAID_DIFFICULTY:                   // not profiled
         case MSG_PARTY_ASSIGNMENT:                      // not profiled
         case MSG_RAID_READY_CHECK:                      // not profiled
+        case CMSG_OFFER_PETITION:
         {
             maxPacketCounterAllowed = 3;
             break;
@@ -1621,7 +1676,6 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
             maxPacketCounterAllowed = PLAYER_SLOTS_COUNT;
             break;
         }
-
         default:
         {
             maxPacketCounterAllowed = 100;
@@ -1630,4 +1684,11 @@ uint32 WorldSession::DosProtection::GetMaxPacketCounterAllowed(uint16 opcode) co
     }
 
     return maxPacketCounterAllowed;
+}
+
+WorldSession::DosProtection::DosProtection(WorldSession* s) : 
+    Session(s), 
+    _policy((Policy)sGameConfig->GetIntConfig("PacketSpoof.Policy"))
+{
+
 }

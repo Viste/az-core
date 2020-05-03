@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -7,14 +7,15 @@
 #include "Common.h"
 #include "CharacterDatabaseCleaner.h"
 #include "World.h"
-#include "Database/DatabaseEnv.h"
+#include "DatabaseEnv.h"
 #include "SpellMgr.h"
 #include "DBCStores.h"
+#include "GameConfig.h"
 
 void CharacterDatabaseCleaner::CleanDatabase()
 {
     // config to disable
-    if (!sWorld->getBoolConfig(CONFIG_CLEAN_CHARACTER_DB))
+    if (!sGameConfig->GetBoolConfig("CleanCharacterDB"))
         return;
 
     sLog->outString("Cleaning character database...");
@@ -46,7 +47,7 @@ void CharacterDatabaseCleaner::CleanDatabase()
 
     // NOTE: In order to have persistentFlags be set in worldstates for the next cleanup,
     // you need to define them at least once in worldstates.
-    flags &= sWorld->getIntConfig(CONFIG_PERSISTENT_CHARACTER_CLEAN_FLAGS);
+    flags &= sGameConfig->GetIntConfig("PersistentCharacterCleanFlags");
     CharacterDatabase.DirectPExecute("UPDATE worldstates SET value = %u WHERE entry = %d", flags, WS_CLEANING_FLAGS);
 
     sWorld->SetCleaningFlags(flags);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -13,7 +13,7 @@
 OutdoorPvPMgr::OutdoorPvPMgr()
 {
     m_UpdateTimer = 0;
-    //sLog->outDebug(LOG_FILTER_OUTDOORPVP, "Instantiating OutdoorPvPMgr");
+    //LOG_DEBUG("outdoorpvp", "Instantiating OutdoorPvPMgr");
 }
 
 OutdoorPvPMgr* OutdoorPvPMgr::instance()
@@ -24,7 +24,7 @@ OutdoorPvPMgr* OutdoorPvPMgr::instance()
 
 void OutdoorPvPMgr::Die()
 {
-    //sLog->outDebug(LOG_FILTER_OUTDOORPVP, "Deleting OutdoorPvPMgr");
+    //LOG_DEBUG("outdoorpvp", "Deleting OutdoorPvPMgr");
     for (OutdoorPvPSet::iterator itr = m_OutdoorPvPSet.begin(); itr != m_OutdoorPvPSet.end(); ++itr)
         delete *itr;
 
@@ -123,7 +123,7 @@ void OutdoorPvPMgr::HandlePlayerEnterZone(Player* player, uint32 zoneid)
 
     itr->second->HandlePlayerEnterZone(player, zoneid);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_OUTDOORPVP, "Player %u entered outdoorpvp id %u", player->GetGUIDLow(), itr->second->GetTypeId());
+    LOG_DEBUG("outdoorpvp", "Player %u entered outdoorpvp id %u", player->GetGUIDLow(), itr->second->GetTypeId());
 #endif
 }
 
@@ -141,7 +141,7 @@ void OutdoorPvPMgr::HandlePlayerLeaveZone(Player* player, uint32 zoneid)
 
     itr->second->HandlePlayerLeaveZone(player, zoneid);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_OUTDOORPVP, "Player %u left outdoorpvp id %u", player->GetGUIDLow(), itr->second->GetTypeId());
+    LOG_DEBUG("outdoorpvp", "Player %u left outdoorpvp id %u", player->GetGUIDLow(), itr->second->GetTypeId());
 #endif
 }
 

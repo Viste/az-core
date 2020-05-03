@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -12,6 +12,7 @@
 #include "ScriptMgr.h"
 #include "Player.h"
 #include "Creature.h"
+#include "GameConfig.h"
 
 namespace acore
 {
@@ -29,6 +30,7 @@ namespace acore
             return uint32(ceil(hk_honor_at_level_f(level, multiplier)));
         }
     }
+
     namespace XP
     {
         inline uint8 GetGrayLevel(uint8 pl_level)
@@ -173,7 +175,7 @@ namespace acore
                     // xpMod *= creature->GetCreatureTemplate()->ModExperience;
                 }
 
-                xpMod *= isBattleGround ? sWorld->getRate(RATE_XP_BG_KILL) : sWorld->getRate(RATE_XP_KILL);
+                xpMod *= isBattleGround ? sGameConfig->GetFloatConfig("Rate.XP.BattlegroundKill") : sGameConfig->GetFloatConfig("Rate.XP.Kill");
                 gain = uint32(gain * xpMod);
             }
 

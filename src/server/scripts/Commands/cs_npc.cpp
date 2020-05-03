@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -21,6 +21,8 @@ EndScriptData */
 #include "CreatureAI.h"
 #include "Player.h"
 #include "Pet.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 
 struct NpcFlagText
 {
@@ -149,7 +151,7 @@ public:
             { "model",          SEC_ADMINISTRATOR,  false, &HandleNpcSetModelCommand,          "" },
             { "movetype",       SEC_ADMINISTRATOR,  false, &HandleNpcSetMoveTypeCommand,       "" },
             { "phase",          SEC_ADMINISTRATOR,  false, &HandleNpcSetPhaseCommand,          "" },
-            { "spawndist",      SEC_ADMINISTRATOR,  false, &HandleNpcSetSpawnDistCommand,      "" },
+            { "wanderdistance", SEC_ADMINISTRATOR,  false, &HandleNpcSetWanderDistanceCommand, "" },
             { "spawntime",      SEC_ADMINISTRATOR,  false, &HandleNpcSetSpawnTimeCommand,      "" },
             { "data",           SEC_ADMINISTRATOR,  false, &HandleNpcSetDataCommand,           "" },
             //{ TODO: fix or remove these commands
@@ -422,7 +424,7 @@ public:
             return false;
 
         uint8 lvl = (uint8) atoi((char*)args);
-        if (lvl < 1 || lvl > sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL) + 3)
+        if (lvl < 1 || lvl > sGameConfig->GetIntConfig("MaxPlayerLevel") + 3)
         {
             handler->SendSysMessage(LANG_BAD_VALUE);
             handler->SetSentErrorMessage(true);
@@ -720,7 +722,7 @@ public:
         uint32 nativeid = target->GetNativeDisplayId();
         uint32 Entry = target->GetEntry();
 
-        int64 curRespawnDelay = target->GetRespawnTimeEx()-time(nullptr);
+        int64 curRespawnDelay = target->GetRespawnTimeEx()-GameTime::GetGameTime();
         if (curRespawnDelay < 0)
             curRespawnDelay = 0;
         std::string curRespawnDelayStr = secsToTimeString(uint64(curRespawnDelay), true);
@@ -935,7 +937,7 @@ public:
     * Valid movement types are:
     * <ul>
     * <li> stay - NPC wont move </li>
-    * <li> random - NPC will move randomly according to the spawndist </li>
+    * <li> random - NPC will move randomly according to the wander_distance </li>
     * <li> way - NPC will move with given waypoints set </li>
     * </ul>
     * additional parameter: NODEL - so no waypoints are deleted, if you
@@ -1107,7 +1109,7 @@ public:
     }
 
     //set spawn dist of creature
-    static bool HandleNpcSetSpawnDistCommand(ChatHandler* handler, const char* args)
+    static bool HandleNpcSetWanderDistanceCommand(ChatHandler* handler, const char* args)
     {
         if (!*args)
             return false;
@@ -1131,7 +1133,7 @@ public:
         else
             return false;
 
-        creature->SetRespawnRadius((float)option);
+        creature->SetWanderDistance((float)option);
         creature->SetDefaultMovementType(mtype);
         creature->GetMotionMaster()->Initialize();
         if (creature->IsAlive())                                // dead creature will reset movement generator at respawn
@@ -1140,7 +1142,7 @@ public:
             creature->Respawn();
         }
 
-        PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_CREATURE_SPAWN_DISTANCE);
+        PreparedStatement* stmt = WorldDatabase.GetPreparedStatement(WORLD_UPD_CREATURE_WANDER_DISTANCE);
 
         stmt->setFloat(0, option);
         stmt->setUInt8(1, uint8(mtype));
@@ -1148,7 +1150,7 @@ public:
 
         WorldDatabase.Execute(stmt);
 
-        handler->PSendSysMessage(LANG_COMMAND_SPAWNDIST, option);
+        handler->PSendSysMessage(LANG_COMMAND_WANDER_DISTANCE, option);
         return true;
     }
 

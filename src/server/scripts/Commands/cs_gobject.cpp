@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -22,6 +22,7 @@ EndScriptData */
 #include "Opcodes.h"
 #include "Transport.h"
 #include "GameObject.h"
+#include "GameTime.h"
 
 class gobject_commandscript : public CommandScript
 {
@@ -310,7 +311,7 @@ public:
 
         if (target)
         {
-            int32 curRespawnDelay = int32(target->GetRespawnTimeEx() - time(nullptr));
+            int32 curRespawnDelay = int32(target->GetRespawnTimeEx() - GameTime::GetGameTime());
             if (curRespawnDelay < 0)
                 curRespawnDelay = 0;
 

@@ -1,12 +1,12 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
 
 #include "ChannelMgr.h"
 #include "Player.h"
-#include "World.h"
+#include "GameConfig.h"
 
 ChannelMgr::~ChannelMgr()
 {
@@ -21,7 +21,7 @@ ChannelMgr* ChannelMgr::forTeam(TeamId teamId)
     static ChannelMgr allianceChannelMgr(TEAM_ALLIANCE);
     static ChannelMgr hordeChannelMgr(TEAM_HORDE);
 
-    if (sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_CHANNEL))
+    if (sGameConfig->GetBoolConfig("AllowTwoSide.Interaction.Channel"))
         return &allianceChannelMgr;        // cross-faction
 
     if (teamId == TEAM_ALLIANCE)
@@ -43,7 +43,6 @@ void ChannelMgr::LoadChannels()
     if (!result)
     {
         sLog->outString(">> Loaded 0 channels for %s", _teamId == TEAM_ALLIANCE ? "Alliance" : "Horde");
-        sLog->outString();
         return;
     }
 
@@ -82,7 +81,6 @@ void ChannelMgr::LoadChannels()
     while (result->NextRow());
 
     sLog->outString(">> Loaded %u channels for %s in %ums", count, _teamId == TEAM_ALLIANCE ? "Alliance" : "Horde", GetMSTimeDiffToNow(oldMSTime));
-    sLog->outString();
 }
 
 Channel* ChannelMgr::GetJoinChannel(std::string const& name, uint32 channelId)
@@ -139,8 +137,8 @@ void ChannelMgr::LoadChannelRights()
     QueryResult result = CharacterDatabase.Query("SELECT name, flags, speakdelay, joinmessage, delaymessage, moderators FROM channels_rights");
     if (!result)
     {
+        sLog->outString(">> Loaded 0 Channel Rights!");
         sLog->outString();
-        sLog->outString(">>  Loaded 0 Channel Rights!");
         return;
     }
 

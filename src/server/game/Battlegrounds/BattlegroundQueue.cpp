@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -17,6 +17,8 @@
 #include "ChannelMgr.h"
 #include "Channel.h"
 #include "ScriptMgr.h"
+#include "GameTime.h"
+#include "GameConfig.h"
 #include <unordered_map>
 
 std::unordered_map<uint64, uint32> BGSpamProtection;
@@ -128,7 +130,7 @@ GroupQueueInfo* BattlegroundQueue::AddGroup(Player * leader, Group * grp, PvPDif
     ginfo->ArenaTeamId                  = arenateamid;
     ginfo->IsRated                      = isRated;
     ginfo->IsInvitedToBGInstanceGUID    = 0;
-    ginfo->JoinTime                     = World::GetGameTimeMS();
+    ginfo->JoinTime                     = GameTime::GetGameTimeMS();
     ginfo->RemoveInviteTime             = 0;
     ginfo->teamId                       = leader->GetTeamId();
     ginfo->RealTeamID                   = leader->GetTeamId(true);
@@ -155,7 +157,7 @@ GroupQueueInfo* BattlegroundQueue::AddGroup(Player * leader, Group * grp, PvPDif
     ginfo->_groupType = index;
 
     // announce world (this doesn't need mutex)
-    if (isRated && sWorld->getBoolConfig(CONFIG_ARENA_QUEUE_ANNOUNCER_ENABLE))
+    if (isRated && sGameConfig->GetBoolConfig("Arena.QueueAnnouncer.Enable"))
         if (ArenaTeam* team = sArenaTeamMgr->GetArenaTeamById(arenateamid))
             sWorld->SendWorldText(LANG_ARENA_QUEUE_ANNOUNCE_WORLD_JOIN, team->GetName().c_str(), ginfo->ArenaType, ginfo->ArenaType, ginfo->ArenaTeamRating);
 
@@ -187,7 +189,7 @@ GroupQueueInfo* BattlegroundQueue::AddGroup(Player * leader, Group * grp, PvPDif
     if (!bg)
         return ginfo;
 
-    if (!isRated && !isPremade && sWorld->getBoolConfig(CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_ENABLE))
+    if (!isRated && !isPremade && sGameConfig->GetBoolConfig("QueueAnnouncer.Enable"))
         SendMessageQueue(leader, bg, bracketEntry);
 
     return ginfo;
@@ -195,7 +197,7 @@ GroupQueueInfo* BattlegroundQueue::AddGroup(Player * leader, Group * grp, PvPDif
 
 void BattlegroundQueue::PlayerInvitedToBGUpdateAverageWaitTime(GroupQueueInfo * ginfo)
 {
-    uint32 timeInQueue = std::max<uint32>(1, getMSTimeDiff(ginfo->JoinTime, World::GetGameTimeMS()));
+    uint32 timeInQueue = std::max<uint32>(1, getMSTimeDiff(ginfo->JoinTime, GameTime::GetGameTimeMS()));
 
     // team_index: bg alliance - TEAM_ALLIANCE, bg horde - TEAM_HORDE, arena skirmish - TEAM_ALLIANCE, arena rated - TEAM_HORDE
     uint8 team_index;
@@ -301,7 +303,7 @@ void BattlegroundQueue::RemovePlayer(uint64 guid, bool sentToBg, uint32 playerQu
     m_QueuedPlayers.erase(itr);
 
     // announce to world if arena team left queue for rated match, show only once
-    if (groupInfo->ArenaType && groupInfo->IsRated && groupInfo->Players.empty() && sWorld->getBoolConfig(CONFIG_ARENA_QUEUE_ANNOUNCER_ENABLE))
+    if (groupInfo->ArenaType && groupInfo->IsRated && groupInfo->Players.empty() && sGameConfig->GetBoolConfig("Arena.QueueAnnouncer.Enable"))
         if (ArenaTeam * team = sArenaTeamMgr->GetArenaTeamById(groupInfo->ArenaTeamId))
             sWorld->SendWorldText(LANG_ARENA_QUEUE_ANNOUNCE_WORLD_EXIT, team->GetName().c_str(), groupInfo->ArenaType, groupInfo->ArenaType, groupInfo->ArenaTeamRating);
 
@@ -395,7 +397,7 @@ void BattlegroundQueue::FillPlayersToBG(Battleground* bg, const int32 aliFree, c
     int32 aliDiff = aliFree - int32(m_SelectionPools[TEAM_ALLIANCE].GetPlayerCount());
     int32 hordeDiff = hordeFree - int32(m_SelectionPools[TEAM_HORDE].GetPlayerCount());
 
-    int32 invType = sWorld->getIntConfig(CONFIG_BATTLEGROUND_INVITATION_TYPE);
+    int32 invType = sGameConfig->GetIntConfig("Battleground.InvitationType");
     int32 invDiff = 0;
 
     // check balance configuration and set the max difference between teams
@@ -478,7 +480,7 @@ void BattlegroundQueue::FillPlayersToBGWithSpecific(Battleground* bg, const int3
     int32 aliDiff = aliFree - int32(m_SelectionPools[TEAM_ALLIANCE].GetPlayerCount());
     int32 hordeDiff = hordeFree - int32(m_SelectionPools[TEAM_HORDE].GetPlayerCount());
 
-    int32 invType = sWorld->getIntConfig(CONFIG_BATTLEGROUND_INVITATION_TYPE);
+    int32 invType = sGameConfig->GetIntConfig("Battleground.InvitationType");
     int32 invDiff = 0;
 
     // check balance configuration and set the max difference between teams
@@ -561,8 +563,8 @@ bool BattlegroundQueue::CheckPremadeMatch(BattlegroundBracketId bracket_id, uint
     // now check if we can move groups from premade queue to normal queue
     // this happens if timer has expired or group size lowered
 
-    uint32 premade_time = sWorld->getIntConfig(CONFIG_BATTLEGROUND_PREMADE_GROUP_WAIT_FOR_MATCH);
-    uint32 time_before = World::GetGameTimeMS() >= premade_time ? World::GetGameTimeMS() - premade_time : 0;
+    uint32 premade_time = sGameConfig->GetIntConfig("Battleground.PremadeGroupWaitForMatch");
+    uint32 time_before = GameTime::GetGameTimeMS() >= premade_time ? GameTime::GetGameTimeMS() - premade_time : 0;
 
     for (uint32 i = 0; i < BG_TEAMS_COUNT; i++)
         if (!m_QueuedGroups[bracket_id][BG_QUEUE_PREMADE_ALLIANCE + i].empty())
@@ -596,7 +598,7 @@ bool BattlegroundQueue::CheckNormalMatch(Battleground * bgTemplate, Battleground
     if (sBattlegroundMgr->isTesting() && bgTemplate->isBattleground() && (m_SelectionPools[TEAM_ALLIANCE].GetPlayerCount() || m_SelectionPools[TEAM_HORDE].GetPlayerCount()))
         return true;
 
-    switch (sWorld->getIntConfig(CONFIG_BATTLEGROUND_INVITATION_TYPE))
+    switch (sGameConfig->GetIntConfig("Battleground.InvitationType"))
     {
     case BG_QUEUE_INVITATION_TYPE_NO_BALANCE: // in this case, as soon as both teams have > mincount, start
         return m_SelectionPools[TEAM_ALLIANCE].GetPlayerCount() >= minPlayers && m_SelectionPools[TEAM_HORDE].GetPlayerCount() >= minPlayers;
@@ -785,7 +787,7 @@ void BattlegroundQueue::BattlegroundQueueUpdate(BattlegroundBracketId bracket_id
     {
         // pussywizard: everything inside this section is mine, do NOT destroy!
 
-        const uint32 currMSTime = World::GetGameTimeMS();
+        const uint32 currMSTime = GameTime::GetGameTimeMS();
         const uint32 discardTime = sBattlegroundMgr->GetRatingDiscardTimer();
         const uint32 maxDefaultRatingDifference = (MaxPlayersPerTeam > 2 ? 300 : 200);
         const uint32 maxCountedMMR = 2500;
@@ -975,7 +977,7 @@ void BattlegroundQueue::SendMessageQueue(Player* leader, Battleground* bg, PvPDi
     uint32 qAlliance = GetPlayersCountInGroupsQueue(bracketId, BG_QUEUE_NORMAL_ALLIANCE);
 
     // Show queue status to player only (when joining battleground queue or Arena and arena world announcer is disabled)
-    if (sWorld->getBoolConfig(CONFIG_BATTLEGROUND_QUEUE_ANNOUNCER_PLAYERONLY) || (bg->isArena() && !sWorld->getBoolConfig(CONFIG_ARENA_QUEUE_ANNOUNCER_ENABLE)))
+    if (sGameConfig->GetBoolConfig("QueueAnnouncer.PlayerOnly") || (bg->isArena() && !sGameConfig->GetBoolConfig("Arena.QueueAnnouncer.Enable")))
     {
         ChatHandler(leader->GetSession()).PSendSysMessage(LANG_BG_QUEUE_ANNOUNCE_SELF, bgName, q_min_level, q_max_level,
             qAlliance, (MinPlayers > qAlliance) ? MinPlayers - qAlliance : (uint32)0, qHorde, (MinPlayers > qHorde) ? MinPlayers - qHorde : (uint32)0);
@@ -987,9 +989,9 @@ void BattlegroundQueue::SendMessageQueue(Player* leader, Battleground* bg, PvPDi
         if (searchGUID == BGSpamProtection.end())
             BGSpamProtection[leader->GetGUID()] = 0; // Leader GUID not found, initialize with 0
 
-        if (sWorld->GetGameTime() - BGSpamProtection[leader->GetGUID()] >= 30)
+        if (GameTime::GetGameTime() - BGSpamProtection[leader->GetGUID()] >= 30)
         {
-            BGSpamProtection[leader->GetGUID()] = sWorld->GetGameTime();
+            BGSpamProtection[leader->GetGUID()] = GameTime::GetGameTime();
             sWorld->SendWorldText(LANG_BG_QUEUE_ANNOUNCE_WORLD, bgName, q_min_level, q_max_level, qAlliance + qHorde, MaxPlayers);
         }
     }
@@ -1058,7 +1060,7 @@ bool BGQueueRemoveEvent::Execute(uint64 /*e_time*/, uint32 /*p_time*/)
         if (bgQueue.IsPlayerInvited(m_PlayerGuid, m_BgInstanceGUID, m_RemoveTime))
         {
             // track if player leaves the BG by not clicking enter button
-            if (bg && bg->isBattleground() && sWorld->getBoolConfig(CONFIG_BATTLEGROUND_TRACK_DESERTERS) &&
+            if (bg && bg->isBattleground() && sGameConfig->GetBoolConfig("Battleground.TrackDeserters.Enable") &&
                 (bg->GetStatus() == STATUS_IN_PROGRESS || bg->GetStatus() == STATUS_WAIT_JOIN))
             {
                 PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_DESERTER_TRACK);

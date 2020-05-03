@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -7,6 +7,7 @@
 #include "Map.h"
 #include "Battleground.h"
 #include "CellImpl.h"
+#include "DisableMgr.h"
 #include "DynamicTree.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -24,6 +25,9 @@
 #include "VMapFactory.h"
 #include "LFGMgr.h"
 #include "Chat.h"
+#include "GameTime.h"
+#include "GameConfig.h"
+
 #ifdef ELUNA
 #include "LuaEngine.h"
 #endif
@@ -56,7 +60,7 @@ Map::~Map()
     }
 
     if (!m_scriptSchedule.empty())
-        sScriptMgr->DecreaseScheduledScriptCount(m_scriptSchedule.size());
+        sMapMgr->DecreaseScheduledScriptCount(m_scriptSchedule.size());
 
     //MMAP::MMapFactory::createOrGetMMapManager()->unloadMap(GetId());
     MMAP::MMapFactory::createOrGetMMapManager()->unloadMapInstance(GetId(), i_InstanceId);
@@ -110,7 +114,7 @@ bool Map::ExistVMap(uint32 mapid, int gx, int gy)
 
 void Map::LoadMMap(int gx, int gy)
 { 
-    if (!MMAP::MMapFactory::IsPathfindingEnabled(this)) // pussywizard
+    if (!DisableMgr::IsPathfindingEnabled(this)) // pussywizard
         return;
 
     int mmapLoadResult = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(GetId(), gx, gy);
@@ -128,7 +132,7 @@ void Map::LoadMMap(int gx, int gy)
             break;
         case MMAP::MMAP_LOAD_RESULT_IGNORED:
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("Ignored MMAP name:%s, id:%d, x:%d, y:%d (vmap rep.: x:%d, y:%d)", GetMapName(), GetId(), gx, gy, gx, gy);
+            LOG_DEBUG("server", "Ignored MMAP name:%s, id:%d, x:%d, y:%d (vmap rep.: x:%d, y:%d)", GetMapName(), GetId(), gx, gy, gx, gy);
 #endif
             break;
     }
@@ -152,7 +156,7 @@ void Map::LoadVMap(int gx, int gy)
             break;
         case VMAP::VMAP_LOAD_RESULT_IGNORED:
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outStaticDebug("Ignored VMAP name:%s, id:%d, x:%d, y:%d (vmap rep.: x:%d, y:%d)", GetMapName(), GetId(), gx, gy, gx, gy);
+            LOG_DEBUG("server", "Ignored VMAP name:%s, id:%d, x:%d, y:%d (vmap rep.: x:%d, y:%d)", GetMapName(), GetId(), gx, gy, gx, gy);
 #endif
             break;
     }
@@ -320,7 +324,7 @@ void Map::SwitchGridContainers(Creature* obj, bool on)
         return;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("Switch object " UI64FMTD " from grid[%u, %u] %u", obj->GetGUID(), cell.data.Part.grid_x, cell.data.Part.grid_y, on);
+    LOG_DEBUG("server", "Switch object " UI64FMTD " from grid[%u, %u] %u", obj->GetGUID(), cell.data.Part.grid_x, cell.data.Part.grid_y, on);
 #endif
     NGridType *ngrid = getNGrid(cell.GridX(), cell.GridY());
     ASSERT(ngrid != NULL);
@@ -446,7 +450,7 @@ bool Map::EnsureGridLoaded(const Cell &cell)
     //if (!isGridObjectDataLoaded(cell.GridX(), cell.GridY()))
     //{
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_MAPS, "Loading grid[%u, %u] for map %u instance %u", cell.GridX(), cell.GridY(), GetId(), i_InstanceId);
+        LOG_DEBUG("maps", "Loading grid[%u, %u] for map %u instance %u", cell.GridX(), cell.GridY(), GetId(), i_InstanceId);
 #endif
 
         setGridObjectDataLoaded(true, cell.GridX(), cell.GridY());
@@ -709,7 +713,7 @@ void Map::VisitNearbyCellsOf(WorldObject* obj, TypeContainerVisitor<acore::Objec
 void Map::Update(const uint32 t_diff, const uint32 s_diff, bool  /*thread*/)
 {
     uint32 mapId = GetId(); // pussywizard: for crashlogs
-    sLog->outDebug(LOG_FILTER_POOLSYS, "%u", mapId); // pussywizard: for crashlogs
+    LOG_DEBUG("pool", "%u", mapId); // pussywizard: for crashlogs
 
     if (t_diff)
         _dynamicTree.update(t_diff);
@@ -836,7 +840,7 @@ void Map::Update(const uint32 t_diff, const uint32 s_diff, bool  /*thread*/)
 
     BuildAndSendUpdateForObjects(); // pussywizard
 
-    sLog->outDebug(LOG_FILTER_POOLSYS, "%u", mapId); // pussywizard: for crashlogs
+    LOG_DEBUG("pool", "%u", mapId); // pussywizard: for crashlogs
 }
 
 void Map::HandleDelayedVisibility()
@@ -943,7 +947,7 @@ void Map::RemoveFromMap(MotionTransport* obj, bool remove)
     if (remove)
     {
         // if option set then object already saved at this moment
-        if (!sWorld->getBoolConfig(CONFIG_SAVE_RESPAWN_TIME_IMMEDIATELY))
+        if (!sGameConfig->GetBoolConfig("SaveRespawnTimeImmediately"))
             obj->SaveRespawnTime();
         DeleteFromWorld(obj);
     }
@@ -1204,7 +1208,7 @@ bool Map::UnloadGrid(NGridType& ngrid)
     GridMaps[gx][gy] = NULL;
 
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("Unloading grid[%u, %u] for map %u finished", x, y, GetId());
+    LOG_DEBUG("server", "Unloading grid[%u, %u] for map %u finished", x, y, GetId());
 #endif
     return true;
 }
@@ -2033,7 +2037,7 @@ bool Map::IsOutdoors(float x, float y, float z) const
     if (wmoEntry)
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outStaticDebug("Got WMOAreaTableEntry! flag %u, areaid %u", wmoEntry->Flags, wmoEntry->areaId);
+        LOG_DEBUG("server", "Got WMOAreaTableEntry! flag %u, areaid %u", wmoEntry->Flags, wmoEntry->areaId);
 #endif
         atEntry = sAreaTableStore.LookupEntry(wmoEntry->areaId);
     }
@@ -2139,7 +2143,7 @@ ZLiquidStatus Map::getLiquidStatus(float x, float y, float z, uint8 ReqLiquidTyp
     if (vmgr->GetLiquidLevel(GetId(), x, y, z, ReqLiquidType, liquid_level, ground_level, liquid_type))
     {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_MAPS, "getLiquidStatus(): vmap liquid level: %f ground: %f type: %u", liquid_level, ground_level, liquid_type);
+        LOG_DEBUG("maps", "getLiquidStatus(): vmap liquid level: %f ground: %f type: %u", liquid_level, ground_level, liquid_type);
 #endif
         // Check water level and ground level
         if (liquid_level > ground_level && z > ground_level - 2)
@@ -2229,7 +2233,7 @@ bool Map::isInLineOfSight(float x1, float y1, float z1, float x2, float y2, floa
     if ((checks & LINEOFSIGHT_CHECK_VMAP) && !VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(GetId(), x1, y1, z1, x2, y2, z2))
         return false;
     
-    if (sWorld->getBoolConfig(CONFIG_CHECK_GOBJECT_LOS) && (checks & LINEOFSIGHT_CHECK_GOBJECT)
+    if (sGameConfig->GetBoolConfig("CheckGameObjectLoS") && (checks & LINEOFSIGHT_CHECK_GOBJECT)
       && !_dynamicTree.isInLineOfSight(x1, y1, z1, x2, y2, z2, phasemask))
         return false;
     return true;
@@ -2371,7 +2375,7 @@ void Map::AddObjectToRemoveList(WorldObject* obj)
     obj->CleanupsBeforeDelete(false);                            // remove or simplify at least cross referenced links
 
     i_objectsToRemove.insert(obj);
-    //sLog->outDebug(LOG_FILTER_MAPS, "Object (GUID: %u TypeId: %u) added to removing list.", obj->GetGUIDLow(), obj->GetTypeId());
+    //LOG_DEBUG("maps", "Object (GUID: %u TypeId: %u) added to removing list.", obj->GetGUIDLow(), obj->GetTypeId());
 }
 
 void Map::AddObjectToSwitchList(WorldObject* obj, bool on)
@@ -2416,7 +2420,7 @@ void Map::RemoveAllObjectsInRemoveList()
         }
     }
 
-    //sLog->outDebug(LOG_FILTER_MAPS, "Object remover 1 check.");
+    //LOG_DEBUG("maps", "Object remover 1 check.");
     while (!i_objectsToRemove.empty())
     {
         std::unordered_set<WorldObject*>::iterator itr = i_objectsToRemove.begin();
@@ -2455,7 +2459,7 @@ void Map::RemoveAllObjectsInRemoveList()
         }
     }
 
-    //sLog->outDebug(LOG_FILTER_MAPS, "Object remover 2 check.");
+    //LOG_DEBUG("maps", "Object remover 2 check.");
 }
 
 uint32 Map::GetPlayersCountExceptGMs() const
@@ -2543,7 +2547,7 @@ InstanceMap::InstanceMap(uint32 id, uint32 InstanceId, uint8 SpawnMode, Map* _pa
 
     // the timer is started by default, and stopped when the first player joins
     // this make sure it gets unloaded if for some reason no player joins
-    m_unloadTimer = std::max(sWorld->getIntConfig(CONFIG_INSTANCE_UNLOAD_DELAY), (uint32)MIN_UNLOAD_DELAY);
+    m_unloadTimer = std::max(sGameConfig->GetIntConfig("Instance.UnloadDelay"), MIN_UNLOAD_DELAY);
 
     // pussywizard:
     if (IsRaid())
@@ -2706,7 +2710,7 @@ bool InstanceMap::AddPlayerToMap(Player* player)
         // increase current instances (hourly limit)
         // xinef: specific instances are still limited
         if (!group || !group->isLFGGroup() || !group->IsLfgRandomInstance())
-            player->AddInstanceEnterTime(GetInstanceId(), time(NULL));
+            player->AddInstanceEnterTime(GetInstanceId(), GameTime::GetGameTime());
 
         if (!playerBind->perm && !mapSave->CanReset() && (!group || !group->isLFGGroup() || !group->IsLfgRandomInstance()))
         {
@@ -2746,14 +2750,14 @@ void InstanceMap::RemovePlayerFromMap(Player* player, bool remove)
 { 
     // pussywizard: moved m_unloadTimer to InstanceMap::AfterPlayerUnlinkFromMap(), in this function if 2 players run out at the same time the instance won't close
     //if (!m_unloadTimer && m_mapRefManager.getSize() == 1)
-    //    m_unloadTimer = m_unloadWhenEmpty ? MIN_UNLOAD_DELAY : std::max(sWorld->getIntConfig(CONFIG_INSTANCE_UNLOAD_DELAY), (uint32)MIN_UNLOAD_DELAY);
+    //    m_unloadTimer = m_unloadWhenEmpty ? MIN_UNLOAD_DELAY : std::max(sGameConfig->GetIntConfig("Instance.UnloadDelay"), (uint32)MIN_UNLOAD_DELAY);
     Map::RemovePlayerFromMap(player, remove);
 }
 
 void InstanceMap::AfterPlayerUnlinkFromMap()
 {
     if (!m_unloadTimer && !HavePlayers())
-        m_unloadTimer = m_unloadWhenEmpty ? MIN_UNLOAD_DELAY : std::max(sWorld->getIntConfig(CONFIG_INSTANCE_UNLOAD_DELAY), (uint32)MIN_UNLOAD_DELAY);
+        m_unloadTimer = m_unloadWhenEmpty ? MIN_UNLOAD_DELAY : std::max(sGameConfig->GetIntConfig("Instance.UnloadDelay"), MIN_UNLOAD_DELAY);
     Map::AfterPlayerUnlinkFromMap();
 }
 
@@ -3052,7 +3056,7 @@ void Map::SaveCreatureRespawnTime(uint32 dbGuid, time_t& respawnTime)
         return;
     }
 
-    time_t now = time(NULL);
+    time_t now = GameTime::GetGameTime();
     if (GetInstanceResetPeriod() > 0 && respawnTime-now+5 >= GetInstanceResetPeriod())
         respawnTime = now+YEAR;
 
@@ -3086,7 +3090,7 @@ void Map::SaveGORespawnTime(uint32 dbGuid, time_t& respawnTime)
         return;
     }
 
-    time_t now = time(NULL);
+    time_t now = GameTime::GetGameTime();
     if (GetInstanceResetPeriod() > 0 && respawnTime-now+5 >= GetInstanceResetPeriod())
         respawnTime = now+YEAR;
 

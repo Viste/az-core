@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -16,6 +16,7 @@ EndScriptData */
 #include "Chat.h"
 #include "Language.h"
 #include "Player.h"
+#include "GameConfig.h"
 
 class account_commandscript : public CommandScript
 {
@@ -67,7 +68,7 @@ public:
         uint32 accountId = handler->GetSession()->GetAccountId();
 
         int expansion = atoi(exp); //get int anyway (0 if error)
-        if (expansion < 0 || uint8(expansion) > sWorld->getIntConfig(CONFIG_EXPANSION))
+        if (expansion < 0 || uint8(expansion) > sGameConfig->GetIntConfig("Expansion"))
         {
             handler->SendSysMessage(LANG_IMPROPER_VALUE);
             handler->SetSentErrorMessage(true);
@@ -104,7 +105,7 @@ public:
             handler->PSendSysMessage(LANG_ACCOUNT_CREATED, accountName);
             if (handler->GetSession())
             {
-                sLog->outDebug(LOG_FILTER_WARDEN, "Account: %d (IP: %s) Character:[%s] (GUID: %u) Change Password.",
+                LOG_DEBUG("warden", "Account: %d (IP: %s) Character:[%s] (GUID: %u) Change Password.",
                     handler->GetSession()->GetAccountId(), handler->GetSession()->GetRemoteAddress().c_str(),
                     handler->GetSession()->GetPlayer()->GetName().c_str(), handler->GetSession()->GetPlayer()->GetGUIDLow());
             }
@@ -272,7 +273,7 @@ public:
                 else
                 {
                     handler->PSendSysMessage("[IP2NATION] Table empty");
-                    ;//sLog->outDebug(LOG_FILTER_NETWORKIO, "[IP2NATION] Table empty");
+                    ;//LOG_DEBUG("network", "[IP2NATION] Table empty");
                 }
             }
             else if (param == "off")
@@ -442,7 +443,7 @@ public:
             return false;
 
         int expansion = atoi(exp); //get int anyway (0 if error)
-        if (expansion < 0 || uint8(expansion) > sWorld->getIntConfig(CONFIG_EXPANSION))
+        if (expansion < 0 || uint8(expansion) > sGameConfig->GetIntConfig("Expansion"))
             return false;
 
         PreparedStatement* stmt = LoginDatabase.GetPreparedStatement(LOGIN_UPD_EXPANSION);

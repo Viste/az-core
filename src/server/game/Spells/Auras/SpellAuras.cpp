@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -66,12 +66,12 @@ _flags(AFLAG_NONE), _effectsToApply(effMask), _needClientUpdate(false), _disable
             GetTarget()->SetVisibleAura(slot, this);
             SetNeedClientUpdate();
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Aura: %u Effect: %d put to unit visible auras slot: %u", GetBase()->GetId(), GetEffectMask(), slot);
+            LOG_DEBUG("spells.aura", "Aura: %u Effect: %d put to unit visible auras slot: %u", GetBase()->GetId(), GetEffectMask(), slot);
 #endif
         }
         else {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-            sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Aura: %u Effect: %d could not find empty unit visible slot", GetBase()->GetId(), GetEffectMask());
+            LOG_DEBUG("spells.aura", "Aura: %u Effect: %d could not find empty unit visible slot", GetBase()->GetId(), GetEffectMask());
 #endif
         }
     }
@@ -153,7 +153,7 @@ void AuraApplication::_HandleEffect(uint8 effIndex, bool apply)
     ASSERT(HasEffect(effIndex) == (!apply));
     ASSERT((1<<effIndex) & _effectsToApply);
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "AuraApplication::_HandleEffect: %u, apply: %u: amount: %u", aurEff->GetAuraType(), apply, aurEff->GetAmount());
+    LOG_DEBUG("spells.aura", "AuraApplication::_HandleEffect: %u, apply: %u: amount: %u", aurEff->GetAuraType(), apply, aurEff->GetAmount());
 #endif
 
     if (apply)
@@ -398,7 +398,7 @@ Aura* Aura::Create(SpellInfo const* spellproto, uint8 effMask, WorldObject* owne
 
 Aura::Aura(SpellInfo const* spellproto, WorldObject* owner, Unit* caster, Item* castItem, uint64 casterGUID) :
 m_spellInfo(spellproto), m_casterGuid(casterGUID ? casterGUID : caster->GetGUID()),
-m_castItemGuid(castItem ? castItem->GetGUID() : 0),m_castItemEntry(castItem ? castItem->GetEntry() : 0), m_applyTime(time(NULL)),
+m_castItemGuid(castItem ? castItem->GetGUID() : 0),m_castItemEntry(castItem ? castItem->GetEntry() : 0), m_applyTime(GameTime::GetGameTime()),
 m_owner(owner), m_timeCla(0), m_updateTargetMapInterval(0),
 m_casterLevel(caster ? caster->getLevel() : m_spellInfo->SpellLevel), m_procCharges(0), m_stackAmount(1),
 m_isRemoved(false), m_isSingleTarget(false), m_isUsingCharges(false)
@@ -2028,7 +2028,7 @@ bool Aura::IsProcOnCooldown() const
 {
     /*if (m_procCooldown)
     {
-        if (m_procCooldown > time(NULL))
+        if (m_procCooldown > GameTime::GetGameTime())
             return true;
     }*/
     return false;
@@ -2036,7 +2036,7 @@ bool Aura::IsProcOnCooldown() const
 
 void Aura::AddProcCooldown(uint32 /*msec*/)
 {
-    //m_procCooldown = time(NULL) + msec;
+    //m_procCooldown = GameTime::GetGameTime() + msec;
 }
 
 void Aura::PrepareProcToTrigger(AuraApplication* aurApp, ProcEventInfo& eventInfo)
@@ -2195,7 +2195,7 @@ void Aura::LoadScripts()
             continue;
         }
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-        sLog->outDebug(LOG_FILTER_SPELLS_AURAS, "Aura::LoadScripts: Script `%s` for aura `%u` is loaded now", (*itr)->_GetScriptName()->c_str(), m_spellInfo->Id);
+        LOG_DEBUG("spells.aura", "Aura::LoadScripts: Script `%s` for aura `%u` is loaded now", (*itr)->_GetScriptName()->c_str(), m_spellInfo->Id);
 #endif
         (*itr)->Register();
         ++itr;

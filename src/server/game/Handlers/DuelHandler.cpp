@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>, released under GNU GPL v2 license: https://github.com/azerothcore/azerothcore-wotlk/blob/master/LICENSE-GPL2
+ * Copyright (C) 2016+     AzerothCore <www.azerothcore.org>
  * Copyright (C) 2008-2016 TrinityCore <http://www.trinitycore.org/>
  * Copyright (C) 2005-2009 MaNGOS <http://getmangos.com/>
  */
@@ -11,6 +11,7 @@
 #include "Opcodes.h"
 #include "UpdateData.h"
 #include "Player.h"
+#include "GameTime.h"
 
 void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
 {
@@ -31,11 +32,11 @@ void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
 
     //sLog->outDebug(LOG_FILTER_PACKETIO, "WORLD: Received CMSG_DUEL_ACCEPTED");
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outStaticDebug("Player 1 is: %u (%s)", player->GetGUIDLow(), player->GetName().c_str());
-    sLog->outStaticDebug("Player 2 is: %u (%s)", plTarget->GetGUIDLow(), plTarget->GetName().c_str());
+    LOG_DEBUG("server", "Player 1 is: %u (%s)", player->GetGUIDLow(), player->GetName().c_str());
+    LOG_DEBUG("server", "Player 2 is: %u (%s)", plTarget->GetGUIDLow(), plTarget->GetName().c_str());
 #endif
 
-    time_t now = time(NULL);
+    time_t now = GameTime::GetGameTime();
     player->duel->startTimer = now;
     plTarget->duel->startTimer = now;
 
@@ -46,7 +47,7 @@ void WorldSession::HandleDuelAcceptedOpcode(WorldPacket& recvPacket)
 void WorldSession::HandleDuelCancelledOpcode(WorldPacket& recvPacket)
 {
 #if defined(ENABLE_EXTRAS) && defined(ENABLE_EXTRA_LOGS)
-    sLog->outDebug(LOG_FILTER_NETWORKIO, "WORLD: Received CMSG_DUEL_CANCELLED");
+    LOG_DEBUG("network", "WORLD: Received CMSG_DUEL_CANCELLED");
 #endif
     uint64 guid;
     recvPacket >> guid;
