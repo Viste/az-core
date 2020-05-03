@@ -147,6 +147,23 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recvData)
             case CHAT_MSG_RAID:
             case CHAT_MSG_GUILD:
             case CHAT_MSG_BATTLEGROUND:
+                // check if addon messages are disabled
+	            if (!sGameConfig->GetBoolConfig("AddonChannel"))
+	            {
+		            recvData.rfinish();
+		            return;
+	            }
+
+                if (sGameConfig->GetBoolConfig("ChatLogs.Addon"))
+	            {
+		            std::string msg;
+                    msg = recvData.ReadCString();
+
+                    if (msg.empty())
+                        return;
+	            }
+
+                break;
             case CHAT_MSG_WHISPER:
 	            // check if addon messages are disabled
 	            if (!sGameConfig->GetBoolConfig("AddonChannel"))
@@ -158,9 +175,11 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket & recvData)
 	            if (sGameConfig->GetBoolConfig("ChatLogs.Addon"))
 	            {
 		            std::string to, msg;
-		            recvData >> to >> msg;
-		            if (msg.empty())
-			            return;
+                    recvData >> to;
+                    msg = recvData.ReadCString();
+                    
+                    if (msg.empty())
+                        return;
 	            }
 
                 break;
