@@ -10,9 +10,9 @@
 #include "Common.h"
 #include "Errors.h"
 #include "ByteConverter.h"
+#include "Util.h"
 #include "MessageBuffer.h"
 #include "StringFormat.h"
-
 #include <exception>
 #include <list>
 #include <map>
