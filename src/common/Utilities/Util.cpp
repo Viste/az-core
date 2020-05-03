@@ -548,24 +548,38 @@ void utf8printf(FILE* out, const char *str, ...)
 void vutf8printf(FILE* out, const char *str, va_list* ap)
 {
 #if AC_PLATFORM == AC_PLATFORM_WINDOWS
-    std::string temp_buf;
-    temp_buf.resize(32 * 1024);
-    std::wstring wtemp_buf;
+    char temp_buf[32 * 1024];
+    wchar_t wtemp_buf[32 * 1024];
 
-    std::size_t temp_len = vsnprintf(&temp_buf[0], 32 * 1024, str, *ap);
-    if (temp_len == size_t(-1)) //vsnprintf returns -1 if the buffer is too small
-        temp_len = 32*1024-1;
+    size_t temp_len = vsnprintf(temp_buf, 32 * 1024, str, *ap);
+    //vsnprintf returns -1 if the buffer is too small
+    if (temp_len == size_t(-1))
+        temp_len = 32 * 1024 - 1;
 
-    temp_buf.resize(strnlen_s(temp_buf.c_str())); // Resize to match the formatted string
+    size_t wtemp_len = 32 * 1024 - 1;
+    Utf8toWStr(temp_buf, temp_len, wtemp_buf, wtemp_len);
 
-    if (!temp_buf.empty())
-    {
-        Utf8toWStr(temp_buf, wtemp_buf, 32 * 1024);
-        wtemp_buf.push_back('\0');
+    CharToOemBuffW(&wtemp_buf[0], &temp_buf[0], uint32(wtemp_len + 1));
+    fprintf(out, "%s", temp_buf);
 
-        CharToOemBuffW(&wtemp_buf[0], &temp_buf[0], wtemp_buf.size());
-    }
-    fprintf(out, "%s", temp_buf.c_str());
+    //std::string temp_buf;
+    //temp_buf.resize(32 * 1024);
+    //std::wstring wtemp_buf;
+
+    //std::size_t temp_len = vsnprintf(&temp_buf[0], 32 * 1024, str, *ap);
+    //if (temp_len == size_t(-1)) //vsnprintf returns -1 if the buffer is too small
+    //    temp_len = 32*1024-1;
+
+    //temp_buf.resize(strnlen_s(temp_buf.c_str())); // Resize to match the formatted string
+
+    //if (!temp_buf.empty())
+    //{
+    //    Utf8toWStr(temp_buf, wtemp_buf, 32 * 1024);
+    //    wtemp_buf.push_back('\0');
+
+    //    CharToOemBuffW(&wtemp_buf[0], &temp_buf[0], wtemp_buf.size());
+    //}
+    //fprintf(out, "%s", temp_buf.c_str());
 #else
     vfprintf(out, str, *ap);
 #endif

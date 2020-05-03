@@ -127,10 +127,10 @@ inline T RoundToInterval(T& num, T floor, T ceil)
 }
 
 // UTF8 handling
-AC_COMMON_API bool Utf8toWStr(const std::string& utf8str, std::wstring& wstr);
+bool Utf8toWStr(const std::string& utf8str, std::wstring& wstr);
 
 // in wsize==max size of buffer, out wsize==real string size
-AC_COMMON_API bool Utf8toWStr(char const* utf8str, size_t csize, wchar_t* wstr, size_t& wsize);
+bool Utf8toWStr(char const* utf8str, size_t csize, wchar_t* wstr, size_t& wsize);
 
 inline bool Utf8toWStr(const std::string& utf8str, wchar_t* wstr, size_t& wsize)
 {
